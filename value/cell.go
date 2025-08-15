@@ -77,7 +77,7 @@ func (c *Cell) SetFloat64(d float64) {
 }
 
 func (c *Cell) SetInt64(d int64) {
-	c.kind = reflect.Float64
+	c.kind = reflect.Int64
 	c.valid = true
 	c.bits = uint64(d)
 }
@@ -133,6 +133,9 @@ func (c Cell) Int64() (int64, error) {
 			return int64(num), nil
 		}
 	}
+	if c.kind == reflect.Float64 {
+		return int64(math.Float64frombits(c.bits)), nil
+	}
 	return int64(c.bits), nil
 }
 
@@ -176,6 +179,9 @@ func (c Cell) Float64() (float64, error) {
 		} else {
 			return num, nil
 		}
+	}
+	if c.kind == reflect.Int64 {
+		return float64(int64(c.bits)), nil
 	}
 	return math.Float64frombits(c.bits), nil
 }

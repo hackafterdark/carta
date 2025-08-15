@@ -18,7 +18,7 @@ if err := carta.Map(rows, &blogs); err != nil {
 	// error
 }
 
-For more examples and guides go to: https://jackskj.github.io/carta/
+For more examples and guides see the README.md
 
 */
 

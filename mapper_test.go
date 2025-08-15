@@ -1,299 +1,278 @@
-package carta_test
+package carta
 
 import (
-	"context"
-	"database/sql"
-	"encoding/json"
-	"errors"
-	"flag"
-	"io/ioutil"
-	"log"
-	"net"
-	"os"
+	"reflect"
 	"testing"
 	"time"
 
-	"github.com/jackskj/carta"
-	td "github.com/jackskj/carta/testdata"
-	"github.com/jackskj/carta/testdata/initdb"
-	diff "github.com/yudai/gojsondiff"
-	"github.com/yudai/gojsondiff/formatter"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/test/bufconn"
-	// "github.com/golang/protobuf/proto"
+	"github.com/DATA-DOG/go-sqlmock"
 )
 
-const (
-	bufSize = 1024 * 1024
-	pg      = "postgres"
-	mysql   = "mysql"
-)
-
-var (
-	update = false
-	initDB = true
-)
-
-var (
-	conn        *grpc.ClientConn
-	ctx         context.Context
-	dbs         map[string]*sql.DB
-	grpcServer  *grpc.Server
-	lis         *bufconn.Listener
-	requests    *td.Requests
-	testResults map[string]interface{}
-)
-
-// Generate test data before running tests
-// Start local server with bufconn
-func setup() {
-	testResults = make(map[string]interface{})
-	ctx = context.Background()
-	lis = bufconn.Listen(bufSize)
-	grpcServer = grpc.NewServer()
-	dbs = map[string]*sql.DB{
-		pg:    td.GetPG(),
-		mysql: td.GetMySql(),
-	}
-	initdb.RegisterInitServiceServer(grpcServer, &initdb.InitServiceMapServer{DBs: dbs})
-	go func() {
-		if err := grpcServer.Serve(lis); err != nil {
-			log.Fatalf("Server exited with error: %v", err)
-		}
-	}()
-	if connection, err := grpc.DialContext(ctx, "bufnet", grpc.WithDialer(bufDialer), grpc.WithInsecure()); err != nil {
-		log.Fatalf("bufnet dial fail: %v", err)
-	} else {
-		conn = connection
-	}
-	if initDB {
-		createDatabase(dbs)
-	}
+type User struct {
+	ID   int
+	Name string
 }
 
-func TestMain(m *testing.M) {
-	updatePtr := flag.Bool("update", false, "update the golden file, results are always considered correct")
-	initdbPtr := flag.Bool("initdb", false, "initialize and populate testing database")
-	flag.Parse()
-	update = *updatePtr
-	initDB = *initdbPtr
-	setup()
-	code := m.Run()
-	goldenFile := "testdata/mapper.golden"
-	if update {
-		// update golden file
-		updateGoldenFile(goldenFile)
-	} else {
-		// compare existing results
-		compareResults(goldenFile)
-	}
-	teardown()
-	os.Exit(code)
+type UserWithAddress struct {
+	ID      int
+	Name    string
+	Address Address
 }
 
-func createDatabase(dbs map[string]*sql.DB) {
-	requests = td.GenerateRequests()
-	for dbName, _ := range dbs {
-		meta := &initdb.Meta{Db: dbName}
-		initService := initdb.NewInitServiceClient(conn)
-		initService.InitDB(ctx, &initdb.InitRequest{Meta: &initdb.Meta{Db: dbName}})
-		for i := 0; i < len(requests.InsertAuthorRequests); i++ {
-			requests.InsertAuthorRequests[i].Meta = meta
-			if _, err := initService.InsertAuthor(ctx, requests.InsertAuthorRequests[i]); err != nil {
-				log.Fatalf("InsertAuthor: %s", err)
-			}
-		}
-		for i := 0; i < len(requests.InsertBlogRequests); i++ {
-			requests.InsertBlogRequests[i].Meta = meta
-			if _, err := initService.InsertBlog(ctx, requests.InsertBlogRequests[i]); err != nil {
-				log.Fatalf("InsertBlog: %s", err)
-			}
-		}
-		for i := 0; i < len(requests.InsertCommentRequests); i++ {
-			requests.InsertCommentRequests[i].Meta = meta
-			if _, err := initService.InsertComment(ctx, requests.InsertCommentRequests[i]); err != nil {
-				log.Fatalf("InsertComment: %s", err)
-			}
-		}
-		for i := 0; i < len(requests.InsertPostRequests); i++ {
-			requests.InsertPostRequests[i].Meta = meta
-			if _, err := initService.InsertPost(ctx, requests.InsertPostRequests[i]); err != nil {
-				log.Fatalf("InsertPost: %s", err)
-			}
-		}
-		for i := 0; i < len(requests.InsertPostTagRequests); i++ {
-			requests.InsertPostTagRequests[i].Meta = meta
-			if _, err := initService.InsertPostTag(ctx, requests.InsertPostTagRequests[i]); err != nil {
-				log.Fatalf("InsertPostTag: %s", err)
-			}
-		}
-		for i := 0; i < len(requests.InsertTagRequests); i++ {
-			requests.InsertTagRequests[i].Meta = meta
-			if _, err := initService.InsertTag(ctx, requests.InsertTagRequests[i]); err != nil {
-				log.Fatalf("InsertTag: %s", err)
-			}
-		}
-	}
+type Address struct {
+	Street string
+	City   string
 }
 
-func updateGoldenFile(goldenFile string) {
-	jsonResult := generateResultBytes()
-	if err := ioutil.WriteFile(goldenFile, jsonResult, 0644); err != nil {
-		log.Fatalln(err)
-	}
+type UserWithPosts struct {
+	ID    int
+	Name  string
+	Posts []Post
 }
 
-func compareResults(goldenFile string) {
-	goldenFileJson, err := ioutil.ReadFile(goldenFile)
+type Post struct {
+	Title   string
+	Content string
+}
+
+type UserWithTags struct {
+	ID   int    `db:"user_id"`
+	Name string `db:"user_name"`
+}
+
+type UserWithNullName struct {
+	ID   int
+	Name *string
+}
+
+type AllTypes struct {
+	Bool    bool
+	Uint64  uint64
+	Float64 float64
+	Time    time.Time
+}
+
+func TestSimpleMap(t *testing.T) {
+	db, mock, err := sqlmock.New()
 	if err != nil {
-		log.Fatalln(err)
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
+	defer db.Close()
 
-	jsonResult := generateResultBytes()
+	rows := sqlmock.NewRows([]string{"ID", "Name"}).
+		AddRow(1, "John Doe")
 
-	resultDiff := diff.New()
-	d, err := resultDiff.Compare(goldenFileJson, jsonResult)
+	mock.ExpectQuery("SELECT (.+) FROM users").WillReturnRows(rows)
+
+	sqlRows, err := db.Query("SELECT * FROM users")
 	if err != nil {
-		log.Fatalln(err)
+		t.Fatalf("error '%s' was not expected when querying rows", err)
 	}
-	formatter := formatter.NewDeltaFormatter()
-	diffString, err := formatter.Format(d)
-	if diffString != "{}\n" {
-		log.Println("Results Do Not Match Golden File, " +
-			"if this is expecred result with go test with --update")
-		log.Fatalln(diffString)
-	}
-}
 
-func generateResultBytes() []byte {
-	var jsonResult []byte
-	if r, err := json.MarshalIndent(testResults, "", "    "); err != nil {
-		log.Fatalln(err)
-	} else {
-		jsonResult = r
-	}
-	return jsonResult
-}
-
-func teardown() {
-	defer conn.Close()
-}
-
-func bufDialer(string, time.Duration) (net.Conn, error) {
-	return lis.Dial()
-}
-
-func query(rawSql string) map[string]*sql.Rows {
-	resp := map[string]*sql.Rows{}
-	for dbName, db := range dbs {
-		stmt, err := db.Prepare(rawSql)
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer stmt.Close()
-		if rows, err := stmt.Query(); err != nil {
-			log.Fatal(err)
-		} else {
-			resp[dbName] = rows
-		}
-	}
-	return resp
-}
-
-func queryPG(rawSql string) (rows *sql.Rows) {
-	var err error
-	if rows, err = dbs[pg].Query(rawSql); err != nil {
-		log.Fatal(err)
-	}
-	return
-}
-
-func queryMysql(rawSql string) (rows *sql.Rows) {
-	var err error
-	stmt, err := dbs[mysql].Prepare(rawSql)
+	var users []User
+	err = Map(sqlRows, &users)
 	if err != nil {
-		log.Fatal(err)
+		t.Errorf("error was not expected while mapping rows: %s", err)
 	}
-	defer stmt.Close()
-	if rows, err = stmt.Query(); err != nil {
-		log.Fatal(err)
-	}
-	return
-}
 
-func TestBlog(m *testing.T) {
-	ans := []byte{}
-	for _, rows := range query(td.BlogQuery) {
-		resp := []td.Blog{}
-		if err := carta.Map(rows, &resp); err != nil {
-			log.Fatal(err.Error())
-		}
-		e, _ := json.Marshal(resp)
-		if len(ans) == 0 {
-			ans = e
-		} else if string(ans) != string(e) {
-			log.Fatal(errors.New("Test Blog Produced Inconsistent Results"))
-		}
-		testResults["TestBlog"] = resp
+	if len(users) != 1 {
+		t.Fatalf("expected 1 user, got %d", len(users))
+	}
+
+	if users[0].ID != 1 || users[0].Name != "John Doe" {
+		t.Errorf("expected user to be {ID:1 Name:\"John Doe\"}, but got {ID:%d Name:\"%s\"}", users[0].ID, users[0].Name)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
 	}
 }
 
-func TestNull(m *testing.T) {
-	respPG := []td.NullTest{}
-	if err := carta.Map(queryPG(td.NullQueryPG), &respPG); err != nil {
-		log.Fatal(err.Error())
+func TestPointerMap(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	respMySQL := []td.NullTest{}
-	if err := carta.Map(queryMysql(td.NullQueryMySql), &respMySQL); err != nil {
-		log.Fatal(err.Error())
+	defer db.Close()
+
+	rows := sqlmock.NewRows([]string{"ID", "Name"}).
+		AddRow(1, "John Doe")
+
+	mock.ExpectQuery("SELECT (.+) FROM users").WillReturnRows(rows)
+
+	sqlRows, err := db.Query("SELECT * FROM users")
+	if err != nil {
+		t.Fatalf("error '%s' was not expected when querying rows", err)
 	}
-	ansPG, _ := json.Marshal(respPG)
-	ansMySQL, _ := json.Marshal(respMySQL)
-	if string(ansPG) != string(ansMySQL) {
-		log.Fatal(errors.New("Test Null Produced Inconsistent Results"))
+
+	var users []*User
+	err = Map(sqlRows, &users)
+	if err != nil {
+		t.Errorf("error was not expected while mapping rows: %s", err)
 	}
-	testResults["TestNull"] = respPG
+
+	if len(users) != 1 {
+		t.Fatalf("expected 1 user, got %d", len(users))
+	}
+
+	if users[0].ID != 1 || users[0].Name != "John Doe" {
+		t.Errorf("expected user to be {ID:1 Name:\"John Doe\"}, but got {ID:%d Name:\"%s\"}", users[0].ID, users[0].Name)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
 }
 
-func TestNotNull(m *testing.T) {
-	respPG := []td.NullTest{}
-	if err := carta.Map(queryPG(td.NotNullQueryPG), &respPG); err != nil {
-		log.Fatal(err.Error())
+func TestNestedMap(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	respMySQL := []td.NullTest{}
-	if err := carta.Map(queryMysql(td.NotNullQueryMySQL), &respMySQL); err != nil {
-		log.Fatal(err.Error())
+	defer db.Close()
+
+	rows := sqlmock.NewRows([]string{"ID", "Name", "Address_Street", "Address_City"}).
+		AddRow(1, "John Doe", "123 Main St", "Anytown")
+
+	mock.ExpectQuery("SELECT (.+) FROM users").WillReturnRows(rows)
+
+	sqlRows, err := db.Query("SELECT * FROM users")
+	if err != nil {
+		t.Fatalf("error '%s' was not expected when querying rows", err)
 	}
-	ansPG, _ := json.Marshal(respPG)
-	ansMySQL, _ := json.Marshal(respMySQL)
-	if string(ansPG) != string(ansMySQL) {
-		log.Println(string(ansMySQL))
-		log.Fatal(errors.New("Test Not Null Produced Inconsistent Results"))
+
+	var users []UserWithAddress
+	err = Map(sqlRows, &users)
+	if err != nil {
+		t.Errorf("error was not expected while mapping rows: %s", err)
 	}
-	testResults["TestNotNull"] = respPG
+
+	if len(users) != 1 {
+		t.Fatalf("expected 1 user, got %d", len(users))
+	}
+
+	expectedUser := UserWithAddress{
+		ID:   1,
+		Name: "John Doe",
+		Address: Address{
+			Street: "123 Main St",
+			City:   "Anytown",
+		},
+	}
+
+	if users[0].ID != expectedUser.ID || users[0].Name != expectedUser.Name || users[0].Address.Street != expectedUser.Address.Street || users[0].Address.City != expectedUser.Address.City {
+		t.Errorf("expected user to be %+v, but got %+v", expectedUser, users[0])
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
 }
 
-func TestPGTypes(m *testing.T) {
-	resp := []td.PGDTypes{}
-	if err := carta.Map(queryPG(td.PGDTypesQuery), &resp); err != nil {
-		log.Fatal(err.Error())
+func TestNestedCollectionMap(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	testResults["TestPGTypes"] = resp
+	defer db.Close()
+
+	rows := sqlmock.NewRows([]string{"ID", "Name", "Posts_Title", "Posts_Content"}).
+		AddRow(1, "John Doe", "First Post", "Hello World").
+		AddRow(1, "John Doe", "Second Post", "Another post")
+
+	mock.ExpectQuery("SELECT (.+) FROM users").WillReturnRows(rows)
+
+	sqlRows, err := db.Query("SELECT * FROM users")
+	if err != nil {
+		t.Fatalf("error '%s' was not expected when querying rows", err)
+	}
+
+	var users []UserWithPosts
+	err = Map(sqlRows, &users)
+	if err != nil {
+		t.Errorf("error was not expected while mapping rows: %s", err)
+	}
+
+	if len(users) != 1 {
+		t.Fatalf("expected 1 user, got %d", len(users))
+	}
+
+	if len(users[0].Posts) != 2 {
+		t.Fatalf("expected 2 posts, got %d", len(users[0].Posts))
+	}
+
+	if users[0].Posts[0].Title != "First Post" || users[0].Posts[1].Title != "Second Post" {
+		t.Errorf("posts not mapped correctly")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
 }
 
-func TestRelation(m *testing.T) {
-	ans := []byte{}
-	for _, rows := range query(td.RelationTestQuery) {
-		resp := []td.RelationTest{}
-		if err := carta.Map(rows, &resp); err != nil {
-			log.Fatal(err.Error())
-		}
-		e, _ := json.Marshal(resp)
-		if len(ans) == 0 {
-			ans = e
-		} else if string(ans) != string(e) {
-			log.Fatal(errors.New("Test Blog Produced Inconsistent Results"))
-		}
-		testResults["TestRelation"] = resp
+func TestTagMap(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer db.Close()
+
+	rows := sqlmock.NewRows([]string{"user_id", "user_name"}).
+		AddRow(1, "John Doe")
+
+	mock.ExpectQuery("SELECT (.+) FROM users").WillReturnRows(rows)
+
+	sqlRows, err := db.Query("SELECT * FROM users")
+	if err != nil {
+		t.Fatalf("error '%s' was not expected when querying rows", err)
+	}
+
+	var users []UserWithTags
+	err = Map(sqlRows, &users)
+	if err != nil {
+		t.Errorf("error was not expected while mapping rows: %s", err)
+	}
+
+	if len(users) != 1 {
+		t.Fatalf("expected 1 user, got %d", len(users))
+	}
+
+	if users[0].ID != 1 || users[0].Name != "John Doe" {
+		t.Errorf("expected user to be {ID:1 Name:\"John Doe\"}, but got {ID:%d Name:\"%s\"}", users[0].ID, users[0].Name)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+}
+
+func TestMapToNonPointer(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer db.Close()
+
+	rows := sqlmock.NewRows([]string{"ID", "Name"}).
+		AddRow(1, "John Doe")
+
+	mock.ExpectQuery("SELECT (.+) FROM users").WillReturnRows(rows)
+
+	sqlRows, err := db.Query("SELECT * FROM users")
+	if err != nil {
+		t.Fatalf("error '%s' was not expected when querying rows", err)
+	}
+
+	var users []User
+	err = Map(sqlRows, users) // Pass by value instead of by pointer
+	if err == nil {
+		t.Errorf("expected an error when mapping to a non-pointer, but got nil")
+	}
+}
+
+func TestNewMapperError(t *testing.T) {
+	_, err := newMapper(reflect.TypeOf(1)) // Pass an invalid type
+	if err == nil {
+		t.Errorf("expected an error when creating a new mapper with an invalid type, but got nil")
 	}
 }

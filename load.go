@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/jackskj/carta/value"
+	"github.com/hackafterdark/carta/value"
 )
 
 func (m *Mapper) loadRows(rows *sql.Rows, colTyps []*sql.ColumnType) (*resolver, error) {
@@ -38,16 +38,20 @@ func (m *Mapper) loadRows(rows *sql.Rows, colTyps []*sql.ColumnType) (*resolver,
 // if new object is foind, create a new instance of a struct that
 // maps onto that struct,
 // for example, if a user maps onto:
-// type Blog struct {
-//          BlogId string
-// }
+//
+//	type Blog struct {
+//	         BlogId string
+//	}
+//
 // blogs := []Blog:
 // carta.Map(rows, &blogs)
 // if a new blog_id column value is found, I instantiatiate a new instance of Blog,
 // set BlogId, then store the pointer referenct to this instance in the resolver
 // nothins is done when the object has been already mapped in previous rows, however,
 // the function contunous to recursivelly map rows for all sub mappings inside Blog
-//  for example, if a blog has many Authors
+//
+//	for example, if a blog has many Authors
+//
 // rows are actually []*Cell, theu are passed here as interface since sql scan requires []interface{}
 func loadRow(m *Mapper, row []interface{}, rsv *resolver) error {
 	var (

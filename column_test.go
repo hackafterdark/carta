@@ -1,0 +1,96 @@
+package carta
+
+import (
+	"reflect"
+	"testing"
+)
+
+func TestToSnakeCase(t *testing.T) {
+	testCases := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "CamelCase to snake_case",
+			input:    "CamelCase",
+			expected: "camel_case",
+		},
+		{
+			name:     "camelCase to snake_case",
+			input:    "camelCase",
+			expected: "camel_case",
+		},
+		{
+			name:     "Already snake_case",
+			input:    "snake_case",
+			expected: "snake_case",
+		},
+		{
+			name:     "String with numbers",
+			input:    "UserID2",
+			expected: "user_id2",
+		},
+		{
+			name:     "Single word",
+			input:    "user",
+			expected: "user",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := toSnakeCase(tc.input)
+			if actual != tc.expected {
+				t.Errorf("expected %s, but got %s", tc.expected, actual)
+			}
+		})
+	}
+}
+
+func TestAllocateColumns(t *testing.T) {
+	m, err := newMapper(reflect.TypeOf(&UserWithAddress{}))
+	if err != nil {
+		t.Fatalf("error creating new mapper: %s", err)
+	}
+	determineFieldsNames(m)
+
+	columns := map[string]column{
+		"ID": {
+			name:        "ID",
+			columnIndex: 0,
+		},
+		"Name": {
+			name:        "Name",
+			columnIndex: 1,
+		},
+		"Address_Street": {
+			name:        "Address_Street",
+			columnIndex: 2,
+		},
+		"Address_City": {
+			name:        "Address_City",
+			columnIndex: 3,
+		},
+	}
+	err = allocateColumns(m, columns)
+	if err != nil {
+		t.Fatalf("error allocating columns: %s", err)
+	}
+
+	if len(m.PresentColumns) != 2 {
+		t.Fatalf("expected 2 present columns for User, got %d", len(m.PresentColumns))
+	}
+
+	addressSubMap := m.SubMaps[2] // Address is the 3rd field (index 2)
+	if len(addressSubMap.PresentColumns) != 2 {
+		t.Fatalf("expected 2 present columns for Address, got %d", len(addressSubMap.PresentColumns))
+	}
+
+	if _, ok := addressSubMap.PresentColumns["Address_Street"]; !ok {
+		t.Errorf("expected 'Address_Street' column to be present in submap")
+	}
+	if _, ok := addressSubMap.PresentColumns["Address_City"]; !ok {
+		t.Errorf("expected 'Address_City' column to be present in submap")
+	}
+}
