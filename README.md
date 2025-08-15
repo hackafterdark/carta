@@ -1,4 +1,3 @@
-
 # Carta
 Dead simple SQL data mapper for complex Go structs. 
 
@@ -26,31 +25,31 @@ Assume that in above exmple, we are using a schema containing has-one and has-ma
 And here is our SQL query along with the corresponging Go struct:
 ```
 select
-       id          as  blog_id,
-       title       as  blog_title,
-       P.id        as  posts_id,         
-       P.name      as  posts_name,
-       A.id        as  author_id,      
-       A.username  as  author_username
-from blog
-       left outer join author A    on  blog.author_id = A.id
-       left outer join post P      on  blog.id = P.blog_id
+       b.id,
+       b.title,
+       p.id        as  posts_id,         
+       p.name      as  posts_name,
+       a.id        as  author_id,      
+       a.username  as  author_username
+from blog b
+       left outer join author a    on  b.author_id = a.id
+       left outer join post p      on  b.id = p.blog_id
 ```
 
 ```
 type Blog struct {
-        Id     int    `db:"blog_id"`
-        Title  string `db:"blog_title"`
-        Posts  []Post
-        Author Author
+        Id     int    `db:"id"`
+        Title  string `db:"title"`
+        Posts  []Post `carta:"posts"`
+        Author Author `carta:"author"`
 }
 type Post struct {
-        Id   int    `db:"posts_id"`
-        Name string `db:"posts_name"`
+        Id   int    `db:"id"`
+        Name string `db:"name"`
 }
 type Author struct {
-        Id       int    `db:"author_id"`
-        Username string `db:"author_username"`
+        Id       int    `db:"id"`
+        Username string `db:"username"`
 }
 ```
 Carta will map the SQL rows while keeping track of those relationships. 
@@ -58,36 +57,36 @@ Carta will map the SQL rows while keeping track of those relationships.
 Results: 
 ```
 rows:
-blog_id | blog_title | posts_id | posts_name | author_id | author_username
-1       | Foo        | 1        | Bar        | 1         | John
-1       | Foo        | 2        | Baz        | 1         | John
-2       | Egg        | 3        | Beacon     | 2         | Ed
+id | title | posts_id | posts_name | author_id | author_username
+1  | Foo   | 1        | Bar        | 1         | John
+1  | Foo   | 2        | Baz        | 1         | John
+2  | Egg   | 3        | Beacon     | 2         | Ed
 
 blogs:
 [{
-	"blog_id": 1,
-	"blog_title": "Foo",
+	"id": 1,
+	"title": "Foo",
 	"author": {
-		"author_id": 1,
-		"author_username": "John"
+		"id": 1,
+		"username": "John"
 	},
 	"posts": [{
-			"post_id": 1,
-			"posts_name": "Bar"
+			"id": 1,
+			"name": "Bar"
 		}, {
-			"post_id": 2,
-			"posts_name": "Baz"
+			"id": 2,
+			"name": "Baz"
 		}]
 }, {
-	"blog_id": 2,
-	"blog_title": "Egg",
+	"id": 2,
+	"title": "Egg",
 	"author": {
-		"author_id": 2,
-		"author_username": "Ed"
+		"id": 2,
+		"username": "Ed"
 	},
 	"posts": [{
-			"post_id": 3,
-			"posts_name": "Beacon"
+			"id": 3,
+			"name": "Beacon"
 		}]
 }]
 ```
@@ -105,32 +104,50 @@ Sqlx does not track has-many relationships when mapping SQL data. This works fin
 
 ### Column and Field Names
 
-Carta will match your SQL columns with corresponding fields. You can use a "db" tag to represent a specific column name.
-Example:
+Carta matches your SQL columns with the corresponding struct fields.
 
+#### Basic Fields
+For basic types (int, string, etc.), use the `db` tag to specify the column name. If no tag is provided, Carta will use the snake_case version of the field name.
+
+```go
+type User struct {
+	// Tag is specified, so "user_id" is the expected column name.
+	Id int `db:"user_id"`
+
+	// No tag, so "user_name" is the expected column name.
+	UserName string
+}
 ```
+
+#### Associations (Nested Structs)
+For nested structs (has-one or has-many relationships), use the `carta` tag to define a prefix for the nested struct's columns. This allows you to reuse struct definitions. The SQL query must then use aliases for the columns of the joined table.
+
+**Example:**
+```go
 type Blog struct {
-	// When tag is not used, the snake case of the fiels is used
-	BlogId int // expected column name : "blog_id"
-
-	// When tag is specified, it takes priority
-	Abc string `db:"blog_title"` // expected column name: "blog_title"
-
-	// If you define multiple fiels with the same struct,
-	// you can use a tag to identify a column prefix 
-	// (with underscore concatination)
-
-	// possible column names:  "writer_author_id", "author_id"
-	Writer Author `db: "writer"`
-        
-	// possible column names: "rewiewer_author_id", "author_id",
-	Reviewer Author `db: "reviewer"`
+    Id     int    `db:"id"`
+    Title  string `db:"title"`
+    Author Author `carta:"author"` // "author" is the prefix
 }
 
 type Author struct {
-	AuthorId int `db:"author_id"`
+    Id       int    `db:"id"`       // Maps to "author_id"
+    Username string `db:"username"` // Maps to "author_username"
 }
 ```
+
+**Corresponding SQL Query:**
+```sql
+select
+    b.id,
+    b.title,
+    a.id as author_id,
+    a.username as author_username
+from blogs b
+left join authors a on b.author_id = a.id
+```
+
+This design promotes struct reusability. The `Author` struct can be used on its own to map to a query like `select id, username from authors` or as a nested struct within `Blog` as shown above.
 
 ### Data Types and Relationships
 
@@ -151,11 +168,11 @@ type Blog struct {
 
 	// To define has-one relationship, use nested structs 
 	// or pointer to a struct
-	Author *Author
+	Author *Author `carta:"author"`
 
 	// To define has-many relationship, use slices
 	// options include: *[]*Post, []*Post, *[]Post, []Post
-	Posts []*Post 
+	Posts []*Post `carta:"posts"`
 
 	// If your has-many relationship corresponds to one column,
 	// you can use a slice of a settable type

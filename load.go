@@ -29,6 +29,9 @@ func (m *Mapper) loadRows(rows *sql.Rows, colTyps []*sql.ColumnType) (*resolver,
 			return nil, err
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return rsv, nil
 }
 

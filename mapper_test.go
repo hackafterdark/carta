@@ -1,6 +1,7 @@
 package carta
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 	"time"
@@ -274,5 +275,86 @@ func TestNewMapperError(t *testing.T) {
 	_, err := newMapper(reflect.TypeOf(1)) // Pass an invalid type
 	if err == nil {
 		t.Errorf("expected an error when creating a new mapper with an invalid type, but got nil")
+	}
+}
+
+type Blog struct {
+	ID     int    `db:"id"`
+	Title  string `db:"title"`
+	Author Author `carta:"author"`
+}
+
+type Author struct {
+	ID   int    `db:"id"`
+	Name string `db:"name"`
+}
+
+func TestCartaTagMap(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer db.Close()
+
+	rows := sqlmock.NewRows([]string{"id", "title", "author_id", "author_name"}).
+		AddRow(1, "My First Blog", 101, "John Doe")
+
+	mock.ExpectQuery("SELECT (.+) FROM blogs").WillReturnRows(rows)
+
+	sqlRows, err := db.Query("SELECT * FROM blogs")
+	if err != nil {
+		t.Fatalf("error '%s' was not expected when querying rows", err)
+	}
+
+	var blogs []Blog
+	err = Map(sqlRows, &blogs)
+	if err != nil {
+		t.Errorf("error was not expected while mapping rows: %s", err)
+	}
+
+	if len(blogs) != 1 {
+		t.Fatalf("expected 1 blog, got %d", len(blogs))
+	}
+
+	expectedBlog := Blog{
+		ID:    1,
+		Title: "My First Blog",
+		Author: Author{
+			ID:   101,
+			Name: "John Doe",
+		},
+	}
+
+	if !reflect.DeepEqual(blogs[0], expectedBlog) {
+		t.Errorf("expected blog to be %+v, but got %+v", expectedBlog, blogs[0])
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+}
+
+func TestMapRowsScanError(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer db.Close()
+
+	rows := sqlmock.NewRows([]string{"ID", "Name"}).
+		AddRow(1, "John Doe").
+		RowError(0, errors.New("scan error"))
+
+	mock.ExpectQuery("SELECT (.+) FROM users").WillReturnRows(rows)
+
+	sqlRows, err := db.Query("SELECT * FROM users")
+	if err != nil {
+		t.Fatalf("error '%s' was not expected when querying rows", err)
+	}
+
+	var users []User
+	err = Map(sqlRows, &users)
+	if err == nil {
+		t.Errorf("expected an error when mapping rows with a scan error, but got nil")
 	}
 }

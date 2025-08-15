@@ -10,7 +10,8 @@ import (
 )
 
 const (
-	CartaTagKey string = "db"
+	DbTagKey    string = "db"
+	CartaTagKey string = "carta"
 )
 
 // SQL Map cardinality can either be:
@@ -235,10 +236,19 @@ func determineFieldsNames(m *Mapper) error {
 	for i := 0; i < m.Typ.NumField(); i++ {
 		field := m.Typ.Field(i)
 		if isExported(field) {
-			if tag := nameFromTag(field.Tag); tag != "" {
-				name = tag
+			// if a submap, use carta tag, otherwise use db tag
+			if _, isSubMap := m.SubMaps[fieldIndex(i)]; isSubMap {
+				if tag := nameFromTag(field.Tag, CartaTagKey); tag != "" {
+					name = tag
+				} else {
+					name = field.Name
+				}
 			} else {
-				name = field.Name
+				if tag := nameFromTag(field.Tag, DbTagKey); tag != "" {
+					name = tag
+				} else {
+					name = field.Name
+				}
 			}
 			f := Field{
 				Name:  name,
@@ -266,9 +276,8 @@ func isExported(f reflect.StructField) bool {
 	return (f.PkgPath == "")
 }
 
-func nameFromTag(t reflect.StructTag) string {
-	return t.Get(CartaTagKey)
-
+func nameFromTag(t reflect.StructTag, tagKey string) string {
+	return t.Get(tagKey)
 }
 
 func isSubMap(t reflect.Type) bool {

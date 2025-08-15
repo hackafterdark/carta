@@ -37,22 +37,35 @@ func ConvertsionError(convErr error, typ reflect.Type) error {
 func NewCell(colTypName string) *Cell {
 	return &Cell{colTypName: colTypName}
 }
+func NewCellWithData(colTypName string, data interface{}) *Cell {
+	c := NewCell(colTypName)
+	c.Scan(data)
+	return c
+}
 
 // implements database/sql scan interface
 func (c *Cell) Scan(src interface{}) error {
-	switch src.(type) {
+	switch v := src.(type) {
+	case int:
+		c.SetInt64(int64(v))
+	case int8:
+		c.SetInt64(int64(v))
+	case int16:
+		c.SetInt64(int64(v))
+	case int32:
+		c.SetInt64(int64(v))
 	case int64:
-		c.SetInt64(src.(int64))
+		c.SetInt64(v)
 	case float64:
-		c.SetFloat64(src.(float64))
+		c.SetFloat64(v)
 	case bool:
-		c.SetBool(src.(bool))
+		c.SetBool(v)
 	case []byte:
-		c.SetString(string(src.([]byte)))
+		c.SetString(string(v))
 	case string:
-		c.SetString(src.(string))
+		c.SetString(v)
 	case time.Time:
-		c.SetTime(src.(time.Time))
+		c.SetTime(v)
 	default:
 		// src is nil
 		c.SetNull()

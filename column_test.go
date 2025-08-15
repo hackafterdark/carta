@@ -36,6 +36,16 @@ func TestToSnakeCase(t *testing.T) {
 			input:    "user",
 			expected: "user",
 		},
+		{
+			name:     "String with space",
+			input:    "user name",
+			expected: "user_name",
+		},
+		{
+			name:     "String with hyphen",
+			input:    "user-name",
+			expected: "user_name",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -92,5 +102,29 @@ func TestAllocateColumns(t *testing.T) {
 	}
 	if _, ok := addressSubMap.PresentColumns["Address_City"]; !ok {
 		t.Errorf("expected 'Address_City' column to be present in submap")
+	}
+}
+
+func TestAllocateColumnsBasic(t *testing.T) {
+	m, err := newMapper(reflect.TypeOf(&[]string{}))
+	if err != nil {
+		t.Fatalf("error creating new mapper: %s", err)
+	}
+	determineFieldsNames(m)
+
+	columns := map[string]column{
+		"tag_name": {
+			name:        "tag_name",
+			columnIndex: 0,
+		},
+	}
+	m.AncestorNames = []string{"tag_name"}
+	err = allocateColumns(m, columns)
+	if err != nil {
+		t.Fatalf("error allocating columns: %s", err)
+	}
+
+	if len(m.PresentColumns) != 1 {
+		t.Fatalf("expected 1 present column, got %d", len(m.PresentColumns))
 	}
 }
