@@ -27,10 +27,10 @@ And here is our SQL query along with the corresponging Go struct:
 select
        b.id,
        b.title,
-       p.id        as  posts_id,         
-       p.name      as  posts_name,
-       a.id        as  author_id,      
-       a.username  as  author_username
+       p.id        as  "posts->id",         
+       p.name      as  "posts->name",
+       a.id        as  "author->id",      
+       a.username  as  "author->username"
 from blog b
        left outer join author a    on  b.author_id = a.id
        left outer join post p      on  b.id = p.blog_id
@@ -57,10 +57,10 @@ Carta will map the SQL rows while keeping track of those relationships.
 Results: 
 ```
 rows:
-id | title | posts_id | posts_name | author_id | author_username
-1  | Foo   | 1        | Bar        | 1         | John
-1  | Foo   | 2        | Baz        | 1         | John
-2  | Egg   | 3        | Beacon     | 2         | Ed
+id | title | posts->id | posts->name | author->id | author->username
+1  | Foo   | 1         | Bar         | 1          | John
+1  | Foo   | 2         | Baz         | 1          | John
+2  | Egg   | 3         | Beacon      | 2          | Ed
 
 blogs:
 [{
@@ -120,7 +120,7 @@ type User struct {
 ```
 
 #### Associations (Nested Structs)
-For nested structs (has-one or has-many relationships), use the `carta` tag to define a prefix for the nested struct's columns. This allows you to reuse struct definitions. The SQL query must then use aliases for the columns of the joined table.
+For nested structs (has-one or has-many relationships), use the `carta` tag to define a prefix for the nested struct's columns. The default delimiter between the prefix and the field name is `->`.
 
 **Example:**
 ```go
@@ -131,8 +131,8 @@ type Blog struct {
 }
 
 type Author struct {
-    Id       int    `db:"id"`       // Maps to "author_id"
-    Username string `db:"username"` // Maps to "author_username"
+    Id       int    `db:"id"`       // Maps to "author->id"
+    Username string `db:"username"` // Maps to "author->username"
 }
 ```
 
@@ -141,13 +141,29 @@ type Author struct {
 select
     b.id,
     b.title,
-    a.id as author_id,
-    a.username as author_username
+    a.id as "author->id",
+    a.username as "author->username"
 from blogs b
 left join authors a on b.author_id = a.id
 ```
+*(Note: Quoting the alias may be necessary depending on the SQL dialect)*
 
 This design promotes struct reusability. The `Author` struct can be used on its own to map to a query like `select id, username from authors` or as a nested struct within `Blog` as shown above.
+
+**Custom Delimiter:**
+You can override the default delimiter by specifying it in the `carta` tag.
+```go
+type Blog struct {
+    Author Author `carta:"author,delimiter=_"`
+}
+```
+**Corresponding SQL Query:**
+```sql
+select
+    a.id as "author_id",
+    a.username as "author_username"
+...
+```
 
 ### Data Types and Relationships
 

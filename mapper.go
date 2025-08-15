@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/hackafterdark/carta/value"
 )
@@ -79,6 +80,7 @@ type Mapper struct {
 	// employees_ is the prefix of the parent (lower case of the parent with "_")
 	Fields        map[fieldIndex]Field
 	AncestorNames []string // Field.Name of ancestors
+	Delimiter     string
 
 	// Nested structs which correspond to any has-one has-many relationships
 	// int is the ith element of this struct where the submap exists
@@ -194,6 +196,7 @@ func newMapper(t reflect.Type) (*Mapper, error) {
 		Typ:       elemTyp,
 		Kind:      elemTyp.Kind(),
 		IsTypePtr: isTypePtr,
+		Delimiter: "->",
 	}
 	if subMaps, err = findSubMaps(mapper.Typ); err != nil {
 		return nil, err
@@ -239,7 +242,16 @@ func determineFieldsNames(m *Mapper) error {
 			// if a submap, use carta tag, otherwise use db tag
 			if _, isSubMap := m.SubMaps[fieldIndex(i)]; isSubMap {
 				if tag := nameFromTag(field.Tag, CartaTagKey); tag != "" {
-					name = tag
+					parts := strings.Split(tag, ",")
+					name = parts[0]
+					if len(parts) > 1 {
+						for _, part := range parts[1:] {
+							option := strings.Split(part, "=")
+							if len(option) == 2 && option[0] == "delimiter" {
+								m.SubMaps[fieldIndex(i)].Delimiter = option[1]
+							}
+						}
+					}
 				} else {
 					name = field.Name
 				}

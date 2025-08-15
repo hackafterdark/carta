@@ -128,3 +128,18 @@ func TestAllocateColumnsBasic(t *testing.T) {
 		t.Fatalf("expected 1 present column, got %d", len(m.PresentColumns))
 	}
 }
+
+func TestGetColumnNameCandidatesWithCustomDelimiter(t *testing.T) {
+	candidates := getColumnNameCandidates("field", []string{"parent"}, "->")
+	expected := map[string]bool{
+		"field":         true,
+		"parent->field": true,
+		"parent_field":  true,
+	}
+
+	for k := range expected {
+		if _, ok := candidates[k]; !ok {
+			t.Errorf("expected candidate %s to be present", k)
+		}
+	}
+}

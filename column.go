@@ -21,7 +21,7 @@ func allocateColumns(m *Mapper, columns map[string]column) error {
 	presentColumns := map[string]column{}
 	for cName, c := range columns {
 		if m.IsBasic {
-			candidates = getColumnNameCandidates("", m.AncestorNames)
+			candidates = getColumnNameCandidates("", m.AncestorNames, m.Delimiter)
 			if _, ok := candidates[cName]; ok {
 				presentColumns[cName] = column{
 					typ:         c.typ,
@@ -32,7 +32,12 @@ func allocateColumns(m *Mapper, columns map[string]column) error {
 			}
 		} else {
 			for i, field := range m.Fields {
-				candidates = getColumnNameCandidates(field.Name, m.AncestorNames)
+				subMap, isSubMap := m.SubMaps[i]
+				delimiter := "_"
+				if isSubMap {
+					delimiter = subMap.Delimiter
+				}
+				candidates = getColumnNameCandidates(field.Name, m.AncestorNames, delimiter)
 				// can only allocate columns to basic fields
 				if isBasicType(field.Typ) {
 					if _, ok := candidates[cName]; ok {
@@ -74,7 +79,7 @@ func allocateColumns(m *Mapper, columns map[string]column) error {
 	return nil
 }
 
-func getColumnNameCandidates(fieldName string, ancestorNames []string) map[string]bool {
+func getColumnNameCandidates(fieldName string, ancestorNames []string, delimiter string) map[string]bool {
 	// empty field name means that the mapper is basic, since there is no struct assiciated with this slice, there is no field name
 	candidates := map[string]bool{}
 	if fieldName != "" {
@@ -86,15 +91,22 @@ func getColumnNameCandidates(fieldName string, ancestorNames []string) map[strin
 		return candidates
 	}
 	nameConcat := fieldName
+	snakeConcat := toSnakeCase(fieldName)
 	for i := len(ancestorNames) - 1; i >= 0; i-- {
+		ancestor := ancestorNames[i]
+		snakeAncestor := toSnakeCase(ancestor)
+
 		if nameConcat == "" {
-			nameConcat = ancestorNames[i]
+			nameConcat = ancestor
+			snakeConcat = snakeAncestor
 		} else {
-			nameConcat = ancestorNames[i] + "_" + nameConcat
+			nameConcat = ancestor + delimiter + nameConcat
+			snakeConcat = snakeAncestor + "_" + snakeConcat
 		}
 		candidates[nameConcat] = true
 		candidates[strings.ToLower(nameConcat)] = true
-		candidates[toSnakeCase(nameConcat)] = true
+		candidates[snakeConcat] = true
+		candidates[strings.ToLower(snakeConcat)] = true
 	}
 	return candidates
 }
