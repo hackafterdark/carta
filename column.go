@@ -33,7 +33,7 @@ func allocateColumns(m *Mapper, columns map[string]column) error {
 		} else {
 			for i, field := range m.Fields {
 				subMap, isSubMap := m.SubMaps[i]
-				delimiter := "_"
+				delimiter := m.Delimiter
 				if isSubMap {
 					delimiter = subMap.Delimiter
 				}

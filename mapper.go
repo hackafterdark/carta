@@ -196,7 +196,7 @@ func newMapper(t reflect.Type) (*Mapper, error) {
 		Typ:       elemTyp,
 		Kind:      elemTyp.Kind(),
 		IsTypePtr: isTypePtr,
-		Delimiter: "->",
+		Delimiter: "_",
 	}
 	if subMaps, err = findSubMaps(mapper.Typ); err != nil {
 		return nil, err
@@ -240,15 +240,16 @@ func determineFieldsNames(m *Mapper) error {
 		field := m.Typ.Field(i)
 		if isExported(field) {
 			// if a submap, use carta tag, otherwise use db tag
-			if _, isSubMap := m.SubMaps[fieldIndex(i)]; isSubMap {
+			if subMap, isSubMap := m.SubMaps[fieldIndex(i)]; isSubMap {
 				if tag := nameFromTag(field.Tag, CartaTagKey); tag != "" {
+					subMap.Delimiter = "->"
 					parts := strings.Split(tag, ",")
 					name = parts[0]
 					if len(parts) > 1 {
 						for _, part := range parts[1:] {
 							option := strings.Split(part, "=")
 							if len(option) == 2 && option[0] == "delimiter" {
-								m.SubMaps[fieldIndex(i)].Delimiter = option[1]
+								subMap.Delimiter = option[1]
 							}
 						}
 					}

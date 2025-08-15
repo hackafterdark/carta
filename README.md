@@ -165,6 +165,27 @@ select
 ...
 ```
 
+### SQLX Support
+Carta provides a convenience function, `Mapx`, for use with the `github.com/jmoiron/sqlx` package. Since `sqlx.Rows` is a wrapper around the standard `sql.Rows`, `Mapx` simply extracts the underlying `sql.Rows` and passes it to the standard `Map` function.
+
+**Example:**
+```go
+import "github.com/jmoiron/sqlx"
+
+// Assume db is an *sqlx.DB instance
+
+rows, err := db.Queryx(query)
+if err != nil {
+    // handle error
+}
+
+var blogs []*Blog
+err = carta.Mapx(rows, &blogs)
+if err != nil {
+    // handle error
+}
+```
+
 ### Data Types and Relationships
 
 Any primative types, time.Time, protobuf Timestamp, and sql.NullX can be loaded with Carta.
