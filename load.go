@@ -18,6 +18,7 @@ func (m *Mapper) loadRows(rows *sql.Rows, colTyps []*sql.ColumnType) (*resolver,
 		colTypNames[i] = colTyps[i].DatabaseTypeName()
 	}
 	rsv := newResolver()
+	rowCount := 0
 	for rows.Next() {
 		for i := 0; i < len(colTyps); i++ {
 			row[i] = value.NewCell(colTypNames[i])
@@ -25,9 +26,10 @@ func (m *Mapper) loadRows(rows *sql.Rows, colTyps []*sql.ColumnType) (*resolver,
 		if err = rows.Scan(row...); err != nil {
 			return nil, err
 		}
-		if err = loadRow(m, row, rsv); err != nil {
+		if err = loadRow(m, row, rsv, rowCount); err != nil {
 			return nil, err
 		}
+		rowCount++
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -56,16 +58,21 @@ func (m *Mapper) loadRows(rows *sql.Rows, colTyps []*sql.ColumnType) (*resolver,
 //	for example, if a blog has many Authors
 //
 // rows are actually []*Cell, theu are passed here as interface since sql scan requires []interface{}
-func loadRow(m *Mapper, row []interface{}, rsv *resolver) error {
+func loadRow(m *Mapper, row []interface{}, rsv *resolver, rowCount int) error {
 	var (
 		err      error
 		dstField reflect.Value // destination field to be set with
 		cell     *value.Cell
 		elem     *element
 		found    bool
+		uid      uniqueValId
 	)
 
-	uid := getUniqueId(row, m)
+	if m.IsBasic {
+		uid = uniqueValId(fmt.Sprintf("row-%d", rowCount))
+	} else {
+		uid = getUniqueId(row, m)
+	}
 
 	if elem, found = rsv.elements[uid]; !found {
 		// unique row mapping found, new object
@@ -216,7 +223,7 @@ func loadRow(m *Mapper, row []interface{}, rsv *resolver) error {
 		if subMap.isNil(row) {
 			continue
 		}
-		if err = loadRow(subMap, row, elem.subMaps[i]); err != nil {
+		if err = loadRow(subMap, row, elem.subMaps[i], rowCount); err != nil {
 			return err
 		}
 	}

@@ -2,6 +2,7 @@ package carta
 
 import (
 	"database/sql"
+	"errors"
 	"sort"
 	"strings"
 )
@@ -17,16 +18,16 @@ type column struct {
 func allocateColumns(m *Mapper, columns map[string]column) error {
 	presentColumns := map[string]column{}
 	if m.IsBasic {
-		candidates := getColumnNameCandidates("", m.AncestorNames, m.Delimiter)
+		if len(columns) != 1 {
+			return errors.New("carta: when mapping to a slice of a basic type, the query must return exactly one column")
+		}
 		for cName, c := range columns {
-			if _, ok := candidates[cName]; ok {
-				presentColumns[cName] = column{
-					typ:         c.typ,
-					name:        cName,
-					columnIndex: c.columnIndex,
-				}
-				delete(columns, cName) // dealocate claimed column
+			presentColumns[cName] = column{
+				typ:         c.typ,
+				name:        cName,
+				columnIndex: c.columnIndex,
 			}
+			delete(columns, cName)
 		}
 	} else {
 		for i, field := range m.Fields {

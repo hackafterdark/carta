@@ -508,3 +508,42 @@ func TestMapDeeplyNestedNoLabels(t *testing.T) {
 		t.Errorf("there were unfulfilled expectations: %s", err)
 	}
 }
+
+func TestMapToBasicSlice(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer db.Close()
+
+	rows := sqlmock.NewRows([]string{"tag"}).
+		AddRow("tag1").
+		AddRow("tag2").
+		AddRow("tag1") // Duplicate tag
+
+	mock.ExpectQuery("SELECT (.+) FROM tags").WillReturnRows(rows)
+
+	sqlRows, err := db.Query("SELECT * FROM tags")
+	if err != nil {
+		t.Fatalf("error '%s' was not expected when querying rows", err)
+	}
+
+	var tags []string
+	err = Map(sqlRows, &tags)
+	if err != nil {
+		t.Errorf("error was not expected while mapping rows: %s", err)
+	}
+
+	if len(tags) != 3 {
+		t.Fatalf("expected 3 tags, got %d", len(tags))
+	}
+
+	expectedTags := []string{"tag1", "tag2", "tag1"}
+	if !reflect.DeepEqual(tags, expectedTags) {
+		t.Errorf("expected tags to be %+v, but got %+v", expectedTags, tags)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+}
