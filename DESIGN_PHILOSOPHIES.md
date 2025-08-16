@@ -8,7 +8,7 @@ Carta adopts the "database mapping" approach (described in Martin Fowler's [book
 ## Comparison to Related Projects
 
 #### GORM
-Carta is NOT an an object-relational mapper(ORM).
+Carta is NOT an object-relational mapper (ORM).
 
 #### sqlx
 Sqlx does not track has-many relationships when mapping SQL data. This works fine when all your relationships are at most has-one (Blog has one Author) ie, each SQL row corresponds to one struct. However, handling has-many relationships (Blog has many Posts), requires  running many queries or running manual post-processing of the result. Carta handles these complexities automatically.
@@ -26,7 +26,7 @@ Making a guess might seem helpful, but it can hide serious, silent bugs. The fol
 -   **Query:** `SELECT name, email FROM users`
 -   **Destination:** `var data []string`
 -   **Behavior:** `carta.Map` **returns an error immediately**: `carta: when mapping to a slice of a basic type, the query must return exactly one column (got 2)`.
--   **Why this is Protection:** The library has no way of knowing if the user intended to map the `name` or the `email` column. A "graceful" solution might be to arbitrarily pick the first column, but this could lead to the wrong data being silently loaded into the slice. By failing fast, `carta` forces the developer to write an unambiguous query (e.g., `SELECT name FROM users`), ensuring the result is guaranteed to be correct.
+-   **Why this is Protection:** The library has no way of knowing if the user intended to map the `name` or the `email` column. A "graceful" solution might be to pick the first column arbitrarily, but this could lead to the wrong data being silently loaded into the slice. By failing fast, `carta` forces the developer to write an unambiguous query (e.g., `SELECT name FROM users`), ensuring the result is guaranteed to be correct.
 
 ---
 
@@ -34,7 +34,7 @@ Making a guess might seem helpful, but it can hide serious, silent bugs. The fol
 
 -   **Query:** `SELECT id, NULL AS name FROM users`
 -   **Destination:** `var users []User` (where `User.Name` is a `string`)
--   **Behavior:** `carta.Map` **returns an error during scanning**: `carta: cannot load null value to type string for column name`.
+-   **Behavior:** `carta.Map` **returns an error during scanning** (e.g., `carta: cannot load NULL into non-nullable type string for column name`).
 -   **Why this is Protection:** A standard Go `string` cannot represent a `NULL` value. A "graceful" but incorrect solution would be to use the zero value (`""`), which is valid data and semantically different from "no data". This can cause subtle bugs in application logic. By failing, `carta` forces the developer to explicitly handle nullability in their Go struct by using a pointer (`*string`) or a nullable type (`sql.NullString`), making the code more robust and correct.
 
 ---

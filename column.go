@@ -19,8 +19,12 @@ type column struct {
 // It populates m.PresentColumns and m.SortedColumnIndexes, sets AncestorNames on sub-maps,
 // and removes claimed entries from the provided columns map.
 //
-// For a mapper marked IsBasic, the function requires exactly one remaining column in
-// columns and binds that single column to the mapper; otherwise it returns an error.
+// For a mapper marked IsBasic:
+//   - Top-level (no ancestors): requires exactly one remaining column overall and binds it.
+//   - Nested (has ancestors): requires exactly one matching ancestor-qualified column among
+//     the remaining columns and binds it.
+//
+// Otherwise it returns an error.
 // For non-basic mappers, it matches basic fields by name using getColumnNameCandidates
 // (honoring the mapper/sub-map delimiter and ancestor names) and records each matched
 // column (including the field index). After collecting direct-field mappings it sorts

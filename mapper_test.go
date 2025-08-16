@@ -666,3 +666,38 @@ func TestNestedBasicSliceMap_MultipleMatchingColumnsError(t *testing.T) {
 		t.Errorf("expected an error when mapping a nested basic slice with multiple matching columns, but got nil")
 	}
 }
+
+func TestNestedBasicSliceMap_TagWhitespace(t *testing.T) {
+	type PostWithTagsWS struct {
+		ID   int      `db:"id"`
+		Tags []string `carta:"   Tags  "` // intentional whitespace
+	}
+
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	rows := sqlmock.NewRows([]string{"id", "Tags"}).
+		AddRow(1, "tag1").
+		AddRow(1, "tag2")
+
+	mock.ExpectQuery("SELECT (.+) FROM posts").WillReturnRows(rows)
+
+	sqlRows, err := db.Query("SELECT * FROM posts")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var posts []PostWithTagsWS
+	if err := Map(sqlRows, &posts); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(posts) != 1 || len(posts[0].Tags) != 2 {
+		t.Fatalf("unexpected result: %#v", posts)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unfulfilled expectations: %s", err)
+	}
+}

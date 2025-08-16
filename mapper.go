@@ -258,7 +258,7 @@ func determineFieldsNames(m *Mapper) error {
 				}
 			} else {
 				if tag := nameFromTag(field.Tag, DbTagKey); tag != "" {
-					name = tag
+					name = strings.TrimSpace(tag)
 				} else {
 					name = field.Name
 				}

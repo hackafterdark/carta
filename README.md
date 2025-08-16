@@ -3,7 +3,7 @@
 
 A simple SQL data mapper for complex Go structs. Load SQL data onto Go structs while keeping track of has-one and has-many relationships.
 
-Carta is not an object-relational mapper(ORM). With large and complex datasets, using ORMs becomes restrictive and reduces performance when working with complex queries. [Read more about the design philosophy.](#design-philosophy)
+Carta is not an object-relational mapper (ORM). With large and complex datasets, using ORMs becomes restrictive and reduces performance when working with complex queries. [Read more about the design philosophy.](#design-philosophy)
 
 ## Examples 
 Using carta is very simple. All you need to do is: 
@@ -20,11 +20,11 @@ blogs := []Blog{}
 carta.Map(rows, &blogs)
 ```
 
-Assume that in above exmple, we are using a schema containing has-one and has-many relationships:
+Assume that in the above example, we are using a schema containing has-one and has-many relationships:
 
 ![schema](https://i.ibb.co/SPH3zhQ/Schema.png)
 
-And here is our SQL query along with the corresponging Go struct:
+And here is our SQL query along with the corresponding Go struct:
 ```
 select
        b.id,
@@ -234,4 +234,4 @@ When mapping to **slices of structs**, Carta removes duplicate entities. This is
 
 When mapping to **slices of basic types** (e.g., `[]string`, `[]int`), every row from the query is treated as a unique element, and **no de-duplication occurs**.
  
-To prevent relatively expensive reflect operations, carta caches the structure of your struct using the column mames of your query response as well as the type of your struct.
+To prevent relatively expensive reflect operations, carta caches the structure of your struct using the column names of your query response as well as the type of your struct.
