@@ -7,6 +7,9 @@ import (
 	"time"
 
 	"github.com/hackafterdark/carta/value"
+
+	"github.com/golang/protobuf/ptypes"
+	"github.com/golang/protobuf/ptypes/timestamp"
 )
 
 type AllNullTypes struct {
@@ -325,6 +328,56 @@ func TestLoadRowNullTypes(t *testing.T) {
 		}
 		if !data.NullTime.Valid || !data.NullTime.Time.Equal(now) {
 			t.Errorf("expected NullTime to be valid and equal to now")
+		}
+	}
+}
+
+type TypeWithTimestamp struct {
+	Timestamp timestamp.Timestamp
+}
+
+func TestLoadRowTimestamp(t *testing.T) {
+	m, err := newMapper(reflect.TypeOf(&TypeWithTimestamp{}))
+	if err != nil {
+		t.Fatalf("error creating new mapper: %s", err)
+	}
+	determineFieldsNames(m)
+
+	columns := map[string]column{
+		"Timestamp": {
+			name:        "Timestamp",
+			columnIndex: 0,
+			i:           0,
+		},
+	}
+	allocateColumns(m, columns)
+
+	now := time.Now()
+	timeCell := value.NewCell("TIMESTAMP")
+	timeCell.SetTime(now)
+
+	row := []interface{}{
+		timeCell,
+	}
+
+	rsv := newResolver()
+	err = loadRow(m, row, rsv, 0)
+	if err != nil {
+		t.Fatalf("error loading row: %s", err)
+	}
+
+	if len(rsv.elements) != 1 {
+		t.Fatalf("expected 1 element, got %d", len(rsv.elements))
+	}
+
+	for _, elem := range rsv.elements {
+		data := elem.v.Interface().(TypeWithTimestamp)
+		ts, err := ptypes.TimestampProto(now)
+		if err != nil {
+			t.Fatalf("error converting time to timestamp: %s", err)
+		}
+		if data.Timestamp.Seconds != ts.Seconds || data.Timestamp.Nanos != ts.Nanos {
+			t.Errorf("expected Timestamp to be %v, but got %v", ts, data.Timestamp)
 		}
 	}
 }
