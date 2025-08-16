@@ -51,18 +51,23 @@ func setDst(m *Mapper, dst reflect.Value, rsv *resolver) error {
 					childDst = elem.v.Field(int(fieldIndex)).Addr()
 				}
 			} else if subMap.Crd == Association {
-				newChildElem = reflect.New(childTyp).Elem()
-				if subMap.IsTypePtr {
-					elem.v.Field(int(fieldIndex)).Set(newChildElem.Addr())
-					childDst = elem.v.Field(int(fieldIndex))
-				} else {
-					elem.v.Field(int(fieldIndex)).Set(newChildElem)
-					childDst = elem.v.Field(int(fieldIndex)).Addr()
+				// Only set the association if it's not nil
+				if len(subMapRsv.elements) > 0 {
+					newChildElem = reflect.New(childTyp).Elem()
+					if subMap.IsTypePtr {
+						elem.v.Field(int(fieldIndex)).Set(newChildElem.Addr())
+						childDst = elem.v.Field(int(fieldIndex))
+					} else {
+						elem.v.Field(int(fieldIndex)).Set(newChildElem)
+						childDst = elem.v.Field(int(fieldIndex)).Addr()
+					}
 				}
 			}
 
 			// setting the child
-			setDst(subMap, childDst, subMapRsv)
+			if len(subMapRsv.elements) > 0 {
+				setDst(subMap, childDst, subMapRsv)
+			}
 		}
 	}
 

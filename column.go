@@ -15,13 +15,10 @@ type column struct {
 }
 
 func allocateColumns(m *Mapper, columns map[string]column) error {
-	var (
-		candidates map[string]bool
-	)
 	presentColumns := map[string]column{}
-	for cName, c := range columns {
-		if m.IsBasic {
-			candidates = getColumnNameCandidates("", m.AncestorNames, m.Delimiter)
+	if m.IsBasic {
+		candidates := getColumnNameCandidates("", m.AncestorNames, m.Delimiter)
+		for cName, c := range columns {
 			if _, ok := candidates[cName]; ok {
 				presentColumns[cName] = column{
 					typ:         c.typ,
@@ -30,16 +27,18 @@ func allocateColumns(m *Mapper, columns map[string]column) error {
 				}
 				delete(columns, cName) // dealocate claimed column
 			}
-		} else {
-			for i, field := range m.Fields {
-				subMap, isSubMap := m.SubMaps[i]
-				delimiter := m.Delimiter
-				if isSubMap {
-					delimiter = subMap.Delimiter
-				}
-				candidates = getColumnNameCandidates(field.Name, m.AncestorNames, delimiter)
-				// can only allocate columns to basic fields
-				if isBasicType(field.Typ) {
+		}
+	} else {
+		for i, field := range m.Fields {
+			subMap, isSubMap := m.SubMaps[i]
+			delimiter := m.Delimiter
+			if isSubMap {
+				delimiter = subMap.Delimiter
+			}
+			candidates := getColumnNameCandidates(field.Name, m.AncestorNames, delimiter)
+			// can only allocate columns to basic fields
+			if isBasicType(field.Typ) {
+				for cName, c := range columns {
 					if _, ok := candidates[cName]; ok {
 						presentColumns[cName] = column{
 							typ:         c.typ,
