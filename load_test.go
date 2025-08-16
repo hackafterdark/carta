@@ -49,7 +49,7 @@ func TestLoadRow(t *testing.T) {
 	}
 
 	rsv := newResolver()
-	err = loadRow(m, row, rsv)
+	err = loadRow(m, row, rsv, 0)
 	if err != nil {
 		t.Fatalf("error loading row: %s", err)
 	}
@@ -98,7 +98,7 @@ func TestLoadRowNullValue(t *testing.T) {
 	}
 
 	rsv := newResolver()
-	err = loadRow(m, row, rsv)
+	err = loadRow(m, row, rsv, 0)
 	if err != nil {
 		t.Fatalf("error loading row: %s", err)
 	}
@@ -167,7 +167,7 @@ func TestLoadRowDataTypes(t *testing.T) {
 	}
 
 	rsv := newResolver()
-	err = loadRow(m, row, rsv)
+	err = loadRow(m, row, rsv, 0)
 	if err != nil {
 		t.Fatalf("error loading row: %s", err)
 	}
@@ -225,7 +225,7 @@ func TestLoadRowConversionError(t *testing.T) {
 	}
 
 	rsv := newResolver()
-	err = loadRow(m, row, rsv)
+	err = loadRow(m, row, rsv, 0)
 	if err == nil {
 		t.Fatalf("expected a conversion error, but got nil")
 	}
@@ -263,7 +263,7 @@ func TestLoadRowNullToNonNull(t *testing.T) {
 	}
 
 	rsv := newResolver()
-	err = loadRow(m, row, rsv)
+	err = loadRow(m, row, rsv, 0)
 	if err == nil {
 		t.Fatalf("expected an error when loading a null value to a non-nullable field, but got nil")
 	}
@@ -297,7 +297,7 @@ func TestLoadRowNullTypes(t *testing.T) {
 	}
 
 	rsv := newResolver()
-	err = loadRow(m, row, rsv)
+	err = loadRow(m, row, rsv, 0)
 	if err != nil {
 		t.Fatalf("error loading row: %s", err)
 	}

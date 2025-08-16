@@ -2,6 +2,7 @@ package carta
 
 import (
 	"database/sql"
+	"fmt"
 	"sort"
 	"strings"
 )
@@ -14,19 +15,70 @@ type column struct {
 	i           fieldIndex
 }
 
+// allocateColumns maps result set columns into the given Mapper's fields and its sub-mappers.
+// It populates m.PresentColumns and m.SortedColumnIndexes, sets AncestorNames on sub-maps,
+// and removes claimed entries from the provided columns map.
+//
+// For a mapper marked IsBasic:
+//   - Top-level (no ancestors): requires exactly one remaining column overall and binds it.
+//   - Nested (has ancestors): requires exactly one matching ancestor-qualified column among
+//     the remaining columns and binds it.
+//
+// Otherwise it returns an error.
+// For non-basic mappers, it matches basic fields by name using getColumnNameCandidates
+// (honoring the mapper/sub-map delimiter and ancestor names) and records each matched
+// column (including the field index). After collecting direct-field mappings it sorts
+// the resulting column indexes for m.SortedColumnIndexes and then recursively allocates
+// columns for each sub-map.
+//
+// The function mutates the Mapper structures and the input columns map. It returns any
+// error returned by recursive allocation or an error when the IsBasic column constraint
+// is violated.
 func allocateColumns(m *Mapper, columns map[string]column) error {
 	presentColumns := map[string]column{}
 	if m.IsBasic {
-		candidates := getColumnNameCandidates("", m.AncestorNames, m.Delimiter)
-		for cName, c := range columns {
-			if _, ok := candidates[cName]; ok {
+		if len(m.AncestorNames) == 0 {
+			// Top-level basic mapper: must map exactly one column overall
+			if len(columns) != 1 {
+				return fmt.Errorf(
+					"carta: when mapping to a slice of a basic type, "+
+						"the query must return exactly one column (got %d)",
+					len(columns),
+				)
+			}
+			for cName, c := range columns {
 				presentColumns[cName] = column{
 					typ:         c.typ,
 					name:        cName,
 					columnIndex: c.columnIndex,
 				}
-				delete(columns, cName) // dealocate claimed column
+				delete(columns, cName)
+				break
 			}
+		} else {
+			// Nested basic mapper: pick exactly one matching ancestor-qualified column
+			candidates := getColumnNameCandidates("", m.AncestorNames, m.Delimiter)
+			var matched []string
+			for cName := range columns {
+				if candidates[cName] {
+					matched = append(matched, cName)
+				}
+			}
+			if len(matched) != 1 {
+				return fmt.Errorf(
+					"carta: basic sub-mapper for %v expected exactly one matching column "+
+						"(ancestors %v), got %d matches",
+					m.Typ, m.AncestorNames, len(matched),
+				)
+			}
+			cName := matched[0]
+			c := columns[cName]
+			presentColumns[cName] = column{
+				typ:         c.typ,
+				name:        cName,
+				columnIndex: c.columnIndex,
+			}
+			delete(columns, cName)
 		}
 	} else {
 		for i, field := range m.Fields {
