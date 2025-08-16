@@ -15,6 +15,42 @@ func TestCell_Scan(t *testing.T) {
 		expected Cell
 	}{
 		{
+			name: "Scan int",
+			src:  int(123),
+			expected: Cell{
+				kind:  reflect.Int64,
+				bits:  123,
+				valid: true,
+			},
+		},
+		{
+			name: "Scan int8",
+			src:  int8(123),
+			expected: Cell{
+				kind:  reflect.Int64,
+				bits:  123,
+				valid: true,
+			},
+		},
+		{
+			name: "Scan int16",
+			src:  int16(123),
+			expected: Cell{
+				kind:  reflect.Int64,
+				bits:  123,
+				valid: true,
+			},
+		},
+		{
+			name: "Scan int32",
+			src:  int32(123),
+			expected: Cell{
+				kind:  reflect.Int64,
+				bits:  123,
+				valid: true,
+			},
+		},
+		{
 			name: "Scan int64",
 			src:  int64(123),
 			expected: Cell{
@@ -105,39 +141,54 @@ func TestCell_Getters(t *testing.T) {
 	now := time.Now()
 
 	testCases := []struct {
-		name        string
-		cell        Cell
-		getBool     bool
-		getInt64    int64
-		getFloat64  float64
-		getString   string
-		getTime     time.Time
-		getNullBool sql.NullBool
+		name          string
+		cell          Cell
+		getBool       bool
+		getInt64      int64
+		getFloat64    float64
+		getString     string
+		getTime       time.Time
+		getNullBool   sql.NullBool
+		getNullInt64  sql.NullInt64
+		getNullString sql.NullString
+		getNullTime   sql.NullTime
 	}{
 		{
-			name:        "Int value",
-			cell:        Cell{kind: reflect.Int64, bits: 123, valid: true},
-			getBool:     true,
-			getInt64:    123,
-			getFloat64:  123,
-			getNullBool: sql.NullBool{Bool: true, Valid: true},
+			name:          "Int value",
+			cell:          Cell{kind: reflect.Int64, bits: 123, valid: true},
+			getBool:       true,
+			getInt64:      123,
+			getFloat64:    123,
+			getNullBool:   sql.NullBool{Bool: true, Valid: true},
+			getNullInt64:  sql.NullInt64{Int64: 123, Valid: true},
+			getNullString: sql.NullString{String: "", Valid: true},
+			getNullTime:   sql.NullTime{Time: time.Time{}, Valid: true},
 		},
 		{
-			name:        "String value",
-			cell:        Cell{kind: reflect.String, text: "hello", valid: true},
-			getString:   "hello",
-			getNullBool: sql.NullBool{Bool: false, Valid: true},
+			name:          "String value",
+			cell:          Cell{kind: reflect.String, text: "hello", valid: true},
+			getString:     "hello",
+			getNullBool:   sql.NullBool{Bool: false, Valid: true},
+			getNullInt64:  sql.NullInt64{Int64: 0, Valid: true},
+			getNullString: sql.NullString{String: "hello", Valid: true},
+			getNullTime:   sql.NullTime{Time: time.Time{}, Valid: true},
 		},
 		{
-			name:        "Time value",
-			cell:        Cell{kind: reflect.Struct, time: now, valid: true},
-			getTime:     now,
-			getNullBool: sql.NullBool{Bool: false, Valid: true},
+			name:          "Time value",
+			cell:          Cell{kind: reflect.Struct, time: now, valid: true},
+			getTime:       now,
+			getNullBool:   sql.NullBool{Bool: false, Valid: true},
+			getNullInt64:  sql.NullInt64{Int64: 0, Valid: true},
+			getNullString: sql.NullString{String: "", Valid: true},
+			getNullTime:   sql.NullTime{Time: now, Valid: true},
 		},
 		{
-			name:        "Null value",
-			cell:        Cell{valid: false},
-			getNullBool: sql.NullBool{Valid: false},
+			name:          "Null value",
+			cell:          Cell{valid: false},
+			getNullBool:   sql.NullBool{Valid: false},
+			getNullInt64:  sql.NullInt64{Valid: false},
+			getNullString: sql.NullString{Valid: false},
+			getNullTime:   sql.NullTime{Valid: false},
 		},
 	}
 
@@ -171,6 +222,21 @@ func TestCell_Getters(t *testing.T) {
 			nb, _ := tc.cell.NullBool()
 			if nb != tc.getNullBool {
 				t.Errorf("NullBool(): expected %v, got %v", tc.getNullBool, nb)
+			}
+
+			ni, _ := tc.cell.NullInt64()
+			if ni != tc.getNullInt64 {
+				t.Errorf("NullInt64(): expected %v, got %v", tc.getNullInt64, ni)
+			}
+
+			ns, _ := tc.cell.NullString()
+			if ns != tc.getNullString {
+				t.Errorf("NullString(): expected %v, got %v", tc.getNullString, ns)
+			}
+
+			nt, _ := tc.cell.NullTime()
+			if nt != tc.getNullTime {
+				t.Errorf("NullTime(): expected %v, got %v", tc.getNullTime, nt)
 			}
 		})
 	}
@@ -241,14 +307,100 @@ func TestCell_Conversions(t *testing.T) {
 }
 
 func TestCell_AsInterface(t *testing.T) {
-	cell := NewCell("INT")
-	cell.SetInt64(123)
-	val, err := cell.AsInterface()
-	if err != nil {
-		t.Fatalf("AsInterface() failed: %v", err)
+	testCases := []struct {
+		name     string
+		cell     func() *Cell
+		expected interface{}
+	}{
+		{
+			name: "AsInterface bool",
+			cell: func() *Cell {
+				c := NewCell("BOOL")
+				c.SetBool(true)
+				return c
+			},
+			expected: true,
+		},
+		{
+			name: "AsInterface int32",
+			cell: func() *Cell {
+				c := NewCell("INT")
+				c.SetInt64(123)
+				c.kind = reflect.Int32
+				return c
+			},
+			expected: int32(123),
+		},
+		{
+			name: "AsInterface int64",
+			cell: func() *Cell {
+				c := NewCell("BIGINT")
+				c.SetInt64(123)
+				return c
+			},
+			expected: int64(123),
+		},
+		{
+			name: "AsInterface uint32",
+			cell: func() *Cell {
+				c := NewCell("INT UNSIGNED")
+				c.SetInt64(123)
+				c.kind = reflect.Uint32
+				return c
+			},
+			expected: uint32(123),
+		},
+		{
+			name: "AsInterface uint64",
+			cell: func() *Cell {
+				c := NewCell("BIGINT UNSIGNED")
+				c.SetInt64(123)
+				c.kind = reflect.Uint64
+				return c
+			},
+			expected: uint64(123),
+		},
+		{
+			name: "AsInterface float32",
+			cell: func() *Cell {
+				c := NewCell("FLOAT")
+				c.bits = uint64(math.Float32bits(123.45))
+				c.kind = reflect.Float32
+				c.valid = true
+				return c
+			},
+			expected: float32(123.45),
+		},
+		{
+			name: "AsInterface float64",
+			cell: func() *Cell {
+				c := NewCell("DOUBLE")
+				c.SetFloat64(123.45)
+				return c
+			},
+			expected: 123.45,
+		},
+		{
+			name: "AsInterface string",
+			cell: func() *Cell {
+				c := NewCell("TEXT")
+				c.SetString("hello")
+				return c
+			},
+			expected: "hello",
+		},
 	}
-	if val.(int64) != 123 {
-		t.Errorf("AsInterface() failed: expected 123, got %v", val)
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			val, err := tc.cell().AsInterface()
+			if err != nil {
+				t.Fatalf("AsInterface() failed: %v", err)
+			}
+			if val != tc.expected {
+				t.Errorf("AsInterface() failed: expected %v, got %v", tc.expected, val)
+			}
+		})
 	}
 }
 
@@ -294,6 +446,33 @@ func TestCell_Uid(t *testing.T) {
 			},
 			expected: "hello",
 		},
+		{
+			name: "Int64 UID",
+			cell: func() *Cell {
+				c := NewCell("BIGINT")
+				c.SetInt64(123456789)
+				return c
+			},
+			expected: "21i3v9",
+		},
+		{
+			name: "Float64 UID",
+			cell: func() *Cell {
+				c := NewCell("DOUBLE")
+				c.SetFloat64(123.45)
+				return c
+			},
+			expected: "z8nf4cjfzqod",
+		},
+		{
+			name: "Time UID",
+			cell: func() *Cell {
+				c := NewCell("TIMESTAMP")
+				c.SetTime(time.Unix(123456789, 0))
+				return c
+			},
+			expected: "21i3v9",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -304,4 +483,145 @@ func TestCell_Uid(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCell_Setters(t *testing.T) {
+	t.Run("SetBool", func(t *testing.T) {
+		c := NewCell("BOOL")
+		c.SetBool(true)
+		if c.Kind() != reflect.Bool || !c.IsValid() || c.bits != 1 {
+			t.Error("SetBool(true) failed")
+		}
+		c.SetBool(false)
+		if c.Kind() != reflect.Bool || !c.IsValid() || c.bits != 0 {
+			t.Error("SetBool(false) failed")
+		}
+	})
+
+	t.Run("SetFloat64", func(t *testing.T) {
+		c := NewCell("DOUBLE")
+		c.SetFloat64(123.45)
+		if c.Kind() != reflect.Float64 || !c.IsValid() || math.Float64frombits(c.bits) != 123.45 {
+			t.Error("SetFloat64() failed")
+		}
+	})
+
+	t.Run("SetInt64", func(t *testing.T) {
+		c := NewCell("BIGINT")
+		c.SetInt64(123)
+		if c.Kind() != reflect.Int64 || !c.IsValid() || c.bits != 123 {
+			t.Error("SetInt64() failed")
+		}
+	})
+
+	t.Run("SetString", func(t *testing.T) {
+		c := NewCell("TEXT")
+		c.SetString("hello")
+		if c.Kind() != reflect.String || !c.IsValid() || c.text != "hello" {
+			t.Error("SetString() failed")
+		}
+	})
+
+	t.Run("SetTime", func(t *testing.T) {
+		now := time.Now()
+		c := NewCell("TIMESTAMP")
+		c.SetTime(now)
+		if c.Kind() != reflect.Struct || !c.IsValid() || !c.time.Equal(now) {
+			t.Error("SetTime() failed")
+		}
+	})
+
+	t.Run("SetNull", func(t *testing.T) {
+		c := NewCell("TEXT")
+		c.SetNull()
+		if c.IsValid() {
+			t.Error("SetNull() failed")
+		}
+	})
+}
+
+func TestCell_Remaining(t *testing.T) {
+	t.Run("NewCellWithData", func(t *testing.T) {
+		c := NewCellWithData("INT", 123)
+		if c.Kind() != reflect.Int64 || !c.IsValid() || c.bits != 123 {
+			t.Error("NewCellWithData() failed")
+		}
+	})
+
+	t.Run("Timestamp", func(t *testing.T) {
+		now := time.Now()
+		c := NewCell("TIMESTAMP")
+		c.SetTime(now)
+		ts, err := c.Timestamp()
+		if err != nil {
+			t.Fatalf("Timestamp() failed: %v", err)
+		}
+		if ts.Seconds != now.Unix() {
+			t.Errorf("Timestamp() failed: expected seconds %v, got %v", now.Unix(), ts.Seconds)
+		}
+	})
+
+	t.Run("NullFloat64", func(t *testing.T) {
+		c := NewCell("DOUBLE")
+		c.SetFloat64(123.45)
+		nf, err := c.NullFloat64()
+		if err != nil {
+			t.Fatalf("NullFloat64() failed: %v", err)
+		}
+		if !nf.Valid || nf.Float64 != 123.45 {
+			t.Errorf("NullFloat64() failed: expected %v, got %v", 123.45, nf.Float64)
+		}
+
+		c.SetNull()
+		nf, err = c.NullFloat64()
+		if err != nil {
+			t.Fatalf("NullFloat64() failed: %v", err)
+		}
+		if nf.Valid {
+			t.Error("NullFloat64() failed: expected invalid, got valid")
+		}
+	})
+
+	t.Run("NullInt32", func(t *testing.T) {
+		c := NewCell("INT")
+		c.SetInt64(123)
+		ni, err := c.NullInt32()
+		if err != nil {
+			t.Fatalf("NullInt32() failed: %v", err)
+		}
+		if !ni.Valid || ni.Int32 != 123 {
+			t.Errorf("NullInt32() failed: expected %v, got %v", 123, ni.Int32)
+		}
+
+		c.SetNull()
+		ni, err = c.NullInt32()
+		if err != nil {
+			t.Fatalf("NullInt32() failed: %v", err)
+		}
+		if ni.Valid {
+			t.Error("NullInt32() failed: expected invalid, got valid")
+		}
+	})
+
+	t.Run("Int64 from float64", func(t *testing.T) {
+		c := NewCell("DOUBLE")
+		c.SetFloat64(123.45)
+		i, err := c.Int64()
+		if err != nil {
+			t.Fatalf("Int64() from float64 failed: %v", err)
+		}
+		if i != 123 {
+			t.Errorf("Int64() from float64 failed: expected 123, got %v", i)
+		}
+	})
+
+	t.Run("Uid default", func(t *testing.T) {
+		c := NewCell("OTHER")
+		c.kind = reflect.Map
+		c.valid = true
+		uid := c.Uid()
+		if uid != "" {
+			t.Errorf("Uid() default failed: expected empty string, got %q", uid)
+		}
+	})
 }
