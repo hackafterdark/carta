@@ -10,8 +10,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/golang/protobuf/ptypes"
-	"github.com/golang/protobuf/ptypes/timestamp"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // TODO:  timestamp/time/ from string
@@ -214,17 +213,18 @@ func (c Cell) Time() (time.Time, error) {
 	return c.time, nil
 }
 
-func (c Cell) Timestamp() (timestamp.Timestamp, error) {
-	var t time.Time
-	var err error
-	if t, err = c.Time(); err != nil {
-		return timestamp.Timestamp{}, err
+func (c Cell) Timestamp() (timestamppb.Timestamp, error) {
+	t, err := c.Time()
+	if err != nil {
+		return timestamppb.Timestamp{}, err
 	}
-	if ts, err := ptypes.TimestampProto(t); err != nil {
-		return timestamp.Timestamp{}, err
-	} else {
-		return *ts, nil
+	if t.IsZero() {
+		return timestamppb.Timestamp{}, nil
 	}
+	return timestamppb.Timestamp{
+		Seconds: t.Unix(),
+		Nanos:   int32(t.Nanosecond()),
+	}, nil
 }
 
 func (c Cell) NullBool() (sql.NullBool, error) {

@@ -8,8 +8,7 @@ import (
 
 	"github.com/hackafterdark/carta/value"
 
-	"github.com/golang/protobuf/ptypes"
-	"github.com/golang/protobuf/ptypes/timestamp"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type AllNullTypes struct {
@@ -333,7 +332,7 @@ func TestLoadRowNullTypes(t *testing.T) {
 }
 
 type TypeWithTimestamp struct {
-	Timestamp timestamp.Timestamp
+	Timestamp timestamppb.Timestamp
 }
 
 func TestLoadRowTimestamp(t *testing.T) {
@@ -372,9 +371,9 @@ func TestLoadRowTimestamp(t *testing.T) {
 
 	for _, elem := range rsv.elements {
 		data := elem.v.Interface().(TypeWithTimestamp)
-		ts, err := ptypes.TimestampProto(now)
-		if err != nil {
-			t.Fatalf("error converting time to timestamp: %s", err)
+		ts := timestamppb.Timestamp{
+			Seconds: now.Unix(),
+			Nanos:   int32(now.Nanosecond()),
 		}
 		if data.Timestamp.Seconds != ts.Seconds || data.Timestamp.Nanos != ts.Nanos {
 			t.Errorf("expected Timestamp to be %v, but got %v", ts, data.Timestamp)

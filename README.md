@@ -202,7 +202,7 @@ if err != nil {
 
 ### Data Types and Relationships
 
-Any primative types, time.Time, protobuf Timestamp, and sql.NullX can be loaded with Carta.
+Any primative types, `time.Time`, `timestamppb.Timestamp` (from `google.golang.org/protobuf/types/known/timestamppb`), and `sql.NullX` can be loaded with Carta.
 These types are one-to-one mapped with your SQL columns
 
 To define more complex SQL relationships use slices and structs as in example below:
@@ -213,7 +213,7 @@ type Blog struct {
 
 	// If your SQL data can be "null", use pointers or sql.NullX
 	AuthorId  *int
-	CreatedOn *timestamp.Timestamp // protobuf timestamp
+	CreatedOn *timestamppb.Timestamp // protobuf timestamp
 	UpdatedOn *time.Time
 	SonsorId  sql.NullInt64
 
@@ -232,13 +232,20 @@ type Blog struct {
 }
 ```
 
-### Drivers 
+### Database Driver Considerations
 
-Recommended driver for Postgres is [lib/pg](https://github.com/lib/pq), for MySql use [go-sql-driver/mysql](https://github.com/go-sql-driver/mysql).
+The behavior of `carta` can be influenced by the specific database driver you use, especially when handling date and time types.
 
-When using MySql, carta expects time data to arrive in time.Time format. Therefore, make sure to add "parseTime=true" in your connection string, when using DATE and DATETIME types.
+`carta` expects the database driver to convert SQL date and time values into Go's `time.Time` type. While many drivers do this by default, some, like the popular `go-sql-driver/mysql`, require a specific connection string parameter to enable this behavior.
 
-Other types, such as TIME, will will be converted from plain text in future versions of Carta.
+**MySQL Example:**
+When using `go-sql-driver/mysql`, `DATE`, `DATETIME`, and `TIMESTAMP` columns are returned as raw bytes by default for performance reasons. To have them correctly scanned into `time.Time` fields, you **must** add `parseTime=true` to your DSN (Data Source Name).
+
+Example Connection String:
+`user:password@tcp(127.0.0.1:3306)/dbname?parseTime=true`
+
+**A Note on the `TIME` Type:**
+The SQL `TIME` type, which represents a time of day without a date, is not consistently handled by all drivers. Support for parsing the `TIME` type when it is returned as plain text will be added in a future version of Carta.
 
 ## Installation 
 ```
