@@ -547,3 +547,27 @@ func TestMapToBasicSlice(t *testing.T) {
 		t.Errorf("there were unfulfilled expectations: %s", err)
 	}
 }
+
+func TestMapToBasicSlice_MultipleColumnsError(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	rows := sqlmock.NewRows([]string{"tag", "extra"}).
+		AddRow("tag1", "x")
+
+	mock.ExpectQuery("SELECT (.+) FROM tags").WillReturnRows(rows)
+
+	sqlRows, err := db.Query("SELECT * FROM tags")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var tags []string
+	err = Map(sqlRows, &tags)
+	if err == nil {
+		t.Fatalf("expected error when mapping to []string with multiple columns, got nil")
+	}
+}

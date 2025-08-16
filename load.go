@@ -2,9 +2,9 @@ package carta
 
 import (
 	"database/sql"
-	"errors"
 	"fmt"
 	"reflect"
+	"strconv"
 
 	"github.com/hackafterdark/carta/value"
 )
@@ -69,7 +69,7 @@ func loadRow(m *Mapper, row []interface{}, rsv *resolver, rowCount int) error {
 	)
 
 	if m.IsBasic {
-		uid = uniqueValId(fmt.Sprintf("row-%d", rowCount))
+		uid = uniqueValId("row-" + strconv.Itoa(rowCount))
 	} else {
 		uid = getUniqueId(row, m)
 	}
@@ -110,7 +110,7 @@ func loadRow(m *Mapper, row []interface{}, rsv *resolver, rowCount int) error {
 			if cell.IsNull() {
 				_, nullable := value.NullableTypes[typ]
 				if !(isDstPtr || nullable) {
-					return errors.New(fmt.Sprintf("carta: cannot load null value to type %s for column %s", typ, col.name))
+					return fmt.Errorf("carta: cannot load null value to type %s for column %s", typ, col.name)
 				}
 				// no need to set destination if cell is null
 			} else {

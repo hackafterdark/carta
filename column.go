@@ -2,7 +2,7 @@ package carta
 
 import (
 	"database/sql"
-	"errors"
+	"fmt"
 	"sort"
 	"strings"
 )
@@ -19,7 +19,7 @@ func allocateColumns(m *Mapper, columns map[string]column) error {
 	presentColumns := map[string]column{}
 	if m.IsBasic {
 		if len(columns) != 1 {
-			return errors.New("carta: when mapping to a slice of a basic type, the query must return exactly one column")
+			return fmt.Errorf("carta: when mapping to a slice of a basic type, the query must return exactly one column (got %d)", len(columns))
 		}
 		for cName, c := range columns {
 			presentColumns[cName] = column{
@@ -28,6 +28,7 @@ func allocateColumns(m *Mapper, columns map[string]column) error {
 				columnIndex: c.columnIndex,
 			}
 			delete(columns, cName)
+			break
 		}
 	} else {
 		for i, field := range m.Fields {
