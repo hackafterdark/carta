@@ -1,4 +1,6 @@
 # Carta
+[![codecov](https://codecov.io/github/hackafterdark/carta/graph/badge.svg?token=TYvbPGGlcL)](https://codecov.io/github/hackafterdark/carta)
+
 Dead simple SQL data mapper for complex Go structs. 
 
 Load SQL data onto Go structs while keeping track of has-one and has-many relationships
