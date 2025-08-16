@@ -15,6 +15,21 @@ type column struct {
 	i           fieldIndex
 }
 
+// allocateColumns maps result set columns into the given Mapper's fields and its sub-mappers.
+// It populates m.PresentColumns and m.SortedColumnIndexes, sets AncestorNames on sub-maps,
+// and removes claimed entries from the provided columns map.
+//
+// For a mapper marked IsBasic, the function requires exactly one remaining column in
+// columns and binds that single column to the mapper; otherwise it returns an error.
+// For non-basic mappers, it matches basic fields by name using getColumnNameCandidates
+// (honoring the mapper/sub-map delimiter and ancestor names) and records each matched
+// column (including the field index). After collecting direct-field mappings it sorts
+// the resulting column indexes for m.SortedColumnIndexes and then recursively allocates
+// columns for each sub-map.
+//
+// The function mutates the Mapper structures and the input columns map. It returns any
+// error returned by recursive allocation or an error when the IsBasic column constraint
+// is violated.
 func allocateColumns(m *Mapper, columns map[string]column) error {
 	presentColumns := map[string]column{}
 	if m.IsBasic {
