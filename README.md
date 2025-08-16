@@ -20,9 +20,30 @@ blogs := []Blog{}
 carta.Map(rows, &blogs)
 ```
 
-Assume that in the above example, we are using a schema containing has-one and has-many relationships:
+Assume that in the above example, we are using a schema containing has-one and has-many relationships, as illustrated in the diagram below:
 
-![schema](https://i.ibb.co/SPH3zhQ/Schema.png)
+```mermaid
+erDiagram
+    blog ||--|| author : "has one"
+    blog ||--o{ post : "has many"
+
+    blog {
+        int id
+        string title
+        int author_id
+    }
+
+    post {
+        int id
+        string name
+        int blog_id
+    }
+
+    author {
+        int id
+        string username
+    }
+```
 
 And here is our SQL query along with the corresponding Go struct:
 ```
