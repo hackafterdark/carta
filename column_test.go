@@ -143,3 +143,45 @@ func TestGetColumnNameCandidatesWithCustomDelimiter(t *testing.T) {
 		}
 	}
 }
+
+func TestAllocateColumnsDeeplyNested(t *testing.T) {
+	m, err := newMapper(reflect.TypeOf(&BlogWithPosts{}))
+	if err != nil {
+		t.Fatalf("error creating new mapper: %s", err)
+	}
+	determineFieldsNames(m)
+
+	columns := map[string]column{
+		"id":                {name: "id", columnIndex: 0},
+		"name":              {name: "name", columnIndex: 1},
+		"posts_id":          {name: "posts_id", columnIndex: 2},
+		"posts_title":       {name: "posts_title", columnIndex: 3},
+		"posts_labels_id":   {name: "posts_labels_id", columnIndex: 4},
+		"posts_labels_name": {name: "posts_labels_name", columnIndex: 5},
+	}
+	err = allocateColumns(m, columns)
+	if err != nil {
+		t.Fatalf("error allocating columns: %s", err)
+	}
+
+	if len(m.PresentColumns) != 2 {
+		t.Fatalf("expected 2 present columns for Blog, got %d", len(m.PresentColumns))
+	}
+
+	postsSubMap := m.SubMaps[2] // Posts is the 3rd field (index 2)
+	if len(postsSubMap.PresentColumns) != 2 {
+		t.Fatalf("expected 2 present columns for Post, got %d", len(postsSubMap.PresentColumns))
+	}
+
+	labelsSubMap := postsSubMap.SubMaps[2] // Labels is the 3rd field (index 2)
+	if len(labelsSubMap.PresentColumns) != 2 {
+		t.Fatalf("expected 2 present columns for Label, got %d", len(labelsSubMap.PresentColumns))
+	}
+
+	if _, ok := labelsSubMap.PresentColumns["posts_labels_id"]; !ok {
+		t.Errorf("expected 'posts_labels_id' column to be present in submap")
+	}
+	if _, ok := labelsSubMap.PresentColumns["posts_labels_name"]; !ok {
+		t.Errorf("expected 'posts_labels_name' column to be present in submap")
+	}
+}

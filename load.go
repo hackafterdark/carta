@@ -213,6 +213,9 @@ func loadRow(m *Mapper, row []interface{}, rsv *resolver) error {
 	}
 
 	for i, subMap := range m.SubMaps {
+		if subMap.isNil(row) {
+			continue
+		}
 		if err = loadRow(subMap, row, elem.subMaps[i]); err != nil {
 			return err
 		}
@@ -229,4 +232,13 @@ func getUniqueId(row []interface{}, m *Mapper) uniqueValId {
 		uid = uid + row[i].(*value.Cell).Uid()
 	}
 	return uniqueValId(uid)
+}
+
+func (m *Mapper) isNil(row []interface{}) bool {
+	for _, col := range m.PresentColumns {
+		if !row[col.columnIndex].(*value.Cell).IsNull() {
+			return false
+		}
+	}
+	return true
 }

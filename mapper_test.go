@@ -409,3 +409,102 @@ func TestCartaTagCustomDelimiterMap(t *testing.T) {
 		t.Errorf("there were unfulfilled expectations: %s", err)
 	}
 }
+
+func TestMapDeeplyNested(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer db.Close()
+
+	label1, label2, label3 := "Label 1", "Label 2", "Label 3"
+	labelID1, labelID2, labelID3 := 1001, 1002, 1003
+	rows := sqlmock.NewRows([]string{"id", "name", "posts_id", "posts_title", "posts_labels_id", "posts_labels_name"}).
+		AddRow(1, "Blog 1", 101, "Post 1", &labelID1, &label1).
+		AddRow(1, "Blog 1", 101, "Post 1", &labelID2, &label2).
+		AddRow(1, "Blog 1", 102, "Post 2", &labelID3, &label3)
+
+	mock.ExpectQuery("SELECT (.+) FROM blogs").WillReturnRows(rows)
+
+	sqlRows, err := db.Query("SELECT * FROM blogs")
+	if err != nil {
+		t.Fatalf("error '%s' was not expected when querying rows", err)
+	}
+
+	var blogs []BlogWithPosts
+	err = Map(sqlRows, &blogs)
+	if err != nil {
+		t.Errorf("error was not expected while mapping rows: %s", err)
+	}
+
+	if len(blogs) != 1 {
+		t.Fatalf("expected 1 blog, got %d", len(blogs))
+	}
+
+	if len(blogs[0].Posts) != 2 {
+		t.Fatalf("expected 2 posts, got %d", len(blogs[0].Posts))
+	}
+
+	if len(blogs[0].Posts[0].Labels) != 2 {
+		t.Fatalf("expected 2 labels for the first post, got %d", len(blogs[0].Posts[0].Labels))
+	}
+
+	if len(blogs[0].Posts[1].Labels) != 1 {
+		t.Fatalf("expected 1 label for the second post, got %d", len(blogs[0].Posts[1].Labels))
+	}
+
+	if *blogs[0].Posts[0].Labels[0].Name != "Label 1" {
+		t.Errorf("incorrect label name")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+}
+
+func TestMapDeeplyNestedNoLabels(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer db.Close()
+
+	label3 := "Label 3"
+	labelID3 := 1003
+	rows := sqlmock.NewRows([]string{"id", "name", "posts_id", "posts_title", "posts_labels_id", "posts_labels_name"}).
+		AddRow(1, "Blog 1", 101, "Post 1", nil, nil).
+		AddRow(1, "Blog 1", 102, "Post 2", &labelID3, &label3)
+
+	mock.ExpectQuery("SELECT (.+) FROM blogs").WillReturnRows(rows)
+
+	sqlRows, err := db.Query("SELECT * FROM blogs")
+	if err != nil {
+		t.Fatalf("error '%s' was not expected when querying rows", err)
+	}
+
+	var blogs []BlogWithPosts
+	err = Map(sqlRows, &blogs)
+	if err != nil {
+		t.Errorf("error was not expected while mapping rows: %s", err)
+	}
+
+	if len(blogs) != 1 {
+		t.Fatalf("expected 1 blog, got %d", len(blogs))
+	}
+
+	if len(blogs[0].Posts) != 2 {
+		t.Fatalf("expected 2 posts, got %d", len(blogs[0].Posts))
+	}
+
+	if len(blogs[0].Posts[0].Labels) != 0 {
+		t.Fatalf("expected 0 labels for the first post, got %d", len(blogs[0].Posts[0].Labels))
+	}
+
+	if len(blogs[0].Posts[1].Labels) != 1 {
+		t.Fatalf("expected 1 label for the second post, got %d", len(blogs[0].Posts[1].Labels))
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+}
