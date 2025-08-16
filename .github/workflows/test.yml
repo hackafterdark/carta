@@ -28,10 +28,10 @@ jobs:
     #   uses: shogo82148/actions-goveralls@v1
     #   with:
     #     path-to-profile: covprofile
-    # Not sure why Codecov broke... leaving it for now but will probably need to remove it
-    - name: Upload coverage reports to Codecov
-      uses: codecov/codecov-action@v5
-      with:
-        files: ./coverage.out
-        token: ${{ secrets.CODECOV_TOKEN }}
-        slug: hackafterdark/carta
+    # Not sure why Codecov broke...
+    # - name: Upload coverage reports to Codecov
+    #   uses: codecov/codecov-action@v5
+    #   with:
+    #     files: ./coverage.out
+    #     token: ${{ secrets.CODECOV_TOKEN }}
+    #     slug: hackafterdark/carta
