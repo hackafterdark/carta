@@ -236,8 +236,9 @@ go get -u github.com/hackafterdark/carta
 
 ## Important Notes 
 
-Carta removes any duplicate rows. This is a side effect of the data mapping as it is unclear which object to instantiate if the same data arrives more than once.
-If this is not a desired outcome, you should include a uniquely identifiable columns in your query and the corresponding fields in your structs.
+When mapping to **slices of structs**, Carta removes duplicate entities. This is a side effect of the data mapping process, which merges rows that identify the same entity (e.g., a `Blog` with the same ID appearing in multiple rows due to a `JOIN`). To ensure correct mapping, you should always include uniquely identifiable columns (like a primary key) in your query for each struct entity.
+
+When mapping to **slices of basic types** (e.g., `[]string`, `[]int`), every row from the query is treated as a unique element, and **no de-duplication occurs**.
  
 To prevent relatively expensive reflect operations, carta caches the structure of your struct using the column mames of your query response as well as the type of your struct. 
 
