@@ -57,7 +57,18 @@ func (m *Mapper) loadRows(rows *sql.Rows, colTyps []*sql.ColumnType) (*resolver,
 //
 //	for example, if a blog has many Authors
 //
-// rows are actually []*Cell, theu are passed here as interface since sql scan requires []interface{}
+// loadRow maps a single scanned SQL row into the resolver using the provided Mapper.
+//
+// It creates or reuses an element in rsv based on a computed unique id:
+// - For basic mappers (m.IsBasic) the id is "row-<rowCount>" (ensures per-row identity).
+// - For non-basic mappers the id is derived from the row values via getUniqueId.
+//
+// The function expects row to contain the scanned values as []*value.Cell (passed as []interface{} because sql.Scan requires that shape).
+// For each present column it converts the corresponding Cell into the destination field (handling pointers, nullable types, basic primitives, and known struct wrappers such as Time, NullBool, NullString, etc.).
+// If a column is NULL, loadRow enforces that the destination is either a pointer or a type listed in value.NullableTypes; otherwise it returns an error.
+// After populating the element it initializes per-submap resolvers (if any) and recursively calls loadRow for each non-nil subMap, passing the same rowCount.
+//
+// Returns an error on conversion failures, attempts to load null into non-nullable destinations, or on any recursive loadRow error.
 func loadRow(m *Mapper, row []interface{}, rsv *resolver, rowCount int) error {
 	var (
 		err      error
