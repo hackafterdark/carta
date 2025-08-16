@@ -571,3 +571,98 @@ func TestMapToBasicSlice_MultipleColumnsError(t *testing.T) {
 		t.Fatalf("expected error when mapping to []string with multiple columns, got nil")
 	}
 }
+
+type PostWithTags struct {
+	ID   int      `db:"id"`
+	Tags []string `carta:"Tags"`
+}
+
+func TestNestedBasicSliceMap(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer db.Close()
+
+	rows := sqlmock.NewRows([]string{"id", "Tags"}).
+		AddRow(1, "tag1").
+		AddRow(1, "tag2")
+
+	mock.ExpectQuery("SELECT (.+) FROM posts").WillReturnRows(rows)
+
+	sqlRows, err := db.Query("SELECT * FROM posts")
+	if err != nil {
+		t.Fatalf("error '%s' was not expected when querying rows", err)
+	}
+
+	var posts []PostWithTags
+	err = Map(sqlRows, &posts)
+	if err != nil {
+		t.Errorf("error was not expected while mapping rows: %s", err)
+	}
+
+	if len(posts) != 1 {
+		t.Fatalf("expected 1 post, got %d", len(posts))
+	}
+
+	if len(posts[0].Tags) != 2 {
+		t.Fatalf("expected 2 tags, got %d", len(posts[0].Tags))
+	}
+
+	expectedTags := []string{"tag1", "tag2"}
+	if !reflect.DeepEqual(posts[0].Tags, expectedTags) {
+		t.Errorf("expected tags to be %+v, but got %+v", expectedTags, posts[0].Tags)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+}
+
+func TestNestedBasicSliceMap_NoMatchingColumnsError(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer db.Close()
+
+	rows := sqlmock.NewRows([]string{"id", "other_column"}).
+		AddRow(1, "value")
+
+	mock.ExpectQuery("SELECT (.+) FROM posts").WillReturnRows(rows)
+
+	sqlRows, err := db.Query("SELECT * FROM posts")
+	if err != nil {
+		t.Fatalf("error '%s' was not expected when querying rows", err)
+	}
+
+	var posts []PostWithTags
+	err = Map(sqlRows, &posts)
+	if err == nil {
+		t.Errorf("expected an error when mapping a nested basic slice with no matching columns, but got nil")
+	}
+}
+
+func TestNestedBasicSliceMap_MultipleMatchingColumnsError(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer db.Close()
+
+	rows := sqlmock.NewRows([]string{"id", "tags", "Tags"}).
+		AddRow(1, "tag1", "tag2")
+
+	mock.ExpectQuery("SELECT (.+) FROM posts").WillReturnRows(rows)
+
+	sqlRows, err := db.Query("SELECT * FROM posts")
+	if err != nil {
+		t.Fatalf("error '%s' was not expected when querying rows", err)
+	}
+
+	var posts []PostWithTags
+	err = Map(sqlRows, &posts)
+	if err == nil {
+		t.Errorf("expected an error when mapping a nested basic slice with multiple matching columns, but got nil")
+	}
+}

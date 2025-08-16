@@ -1,9 +1,9 @@
 # Carta
 [![codecov](https://codecov.io/github/hackafterdark/carta/graph/badge.svg?token=TYvbPGGlcL)](https://codecov.io/github/hackafterdark/carta)
 
-Dead simple SQL data mapper for complex Go structs. 
+A simple SQL data mapper for complex Go structs. Load SQL data onto Go structs while keeping track of has-one and has-many relationships.
 
-Load SQL data onto Go structs while keeping track of has-one and has-many relationships
+Carta is not an object-relational mapper(ORM). With large and complex datasets, using ORMs becomes restrictive and reduces performance when working with complex queries. [Read more about the design philosophy.](#design-philosophy)
 
 ## Examples 
 Using carta is very simple. All you need to do is: 
@@ -92,15 +92,6 @@ blogs:
 		}]
 }]
 ```
-
-
-## Comparison to Related Projects
-
-#### GORM
-Carta is NOT an an object-relational mapper(ORM). Read more in [Approach](#Approach)
-
-#### sqlx
-Sqlx does not track has-many relationships when mapping SQL data. This works fine when all your relationships are at most has-one (Blog has one Author) ie, each SQL row corresponds to one struct. However, handling has-many relationships (Blog has many Posts), requires  running many queries or running manual post-processing of the result. Carta handles these complexities automatically.
 
 ## Guide
 
@@ -233,19 +224,14 @@ Other types, such as TIME, will will be converted from plain text in future vers
 go get -u github.com/hackafterdark/carta
 ```
 
+## Design Philosophy
 
-## Important Notes 
+The `carta` package follows a "fail-fast" philosophy to ensure that mapping operations are unambiguous and to protect users from silent bugs. For a detailed explanation of the error handling approach and the balance between user protection and graceful handling, please see the [Design Philosophies](./DESIGN_PHILOSOPHIES.md) document.
+
+## Important Notes
 
 When mapping to **slices of structs**, Carta removes duplicate entities. This is a side effect of the data mapping process, which merges rows that identify the same entity (e.g., a `Blog` with the same ID appearing in multiple rows due to a `JOIN`). To ensure correct mapping, you should always include uniquely identifiable columns (like a primary key) in your query for each struct entity.
 
 When mapping to **slices of basic types** (e.g., `[]string`, `[]int`), every row from the query is treated as a unique element, and **no de-duplication occurs**.
  
-To prevent relatively expensive reflect operations, carta caches the structure of your struct using the column mames of your query response as well as the type of your struct. 
-
-## Approach
-Carta adopts the "database mapping" approach (described in Martin Fowler's [book](https://books.google.com/books?id=FyWZt5DdvFkC&lpg=PA1&dq=Patterns%20of%20Enterprise%20Application%20Architecture%20by%20Martin%20Fowler&pg=PT187#v=onepage&q=active%20record&f=false)) which is useful among organizations with strict code review processes.
-
-Carta is not an object-relational mapper(ORM). With large and complex datasets, using ORMs becomes restrictive and reduces performance when working with complex queries. 
-
-### License
-Apache License
+To prevent relatively expensive reflect operations, carta caches the structure of your struct using the column mames of your query response as well as the type of your struct.

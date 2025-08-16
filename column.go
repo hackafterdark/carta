@@ -18,17 +18,48 @@ type column struct {
 func allocateColumns(m *Mapper, columns map[string]column) error {
 	presentColumns := map[string]column{}
 	if m.IsBasic {
-		if len(columns) != 1 {
-			return fmt.Errorf("carta: when mapping to a slice of a basic type, the query must return exactly one column (got %d)", len(columns))
-		}
-		for cName, c := range columns {
+		if len(m.AncestorNames) == 0 {
+			// Top-level basic mapper: must map exactly one column overall
+			if len(columns) != 1 {
+				return fmt.Errorf(
+					"carta: when mapping to a slice of a basic type, "+
+						"the query must return exactly one column (got %d)",
+					len(columns),
+				)
+			}
+			for cName, c := range columns {
+				presentColumns[cName] = column{
+					typ:         c.typ,
+					name:        cName,
+					columnIndex: c.columnIndex,
+				}
+				delete(columns, cName)
+				break
+			}
+		} else {
+			// Nested basic mapper: pick exactly one matching ancestor-qualified column
+			candidates := getColumnNameCandidates("", m.AncestorNames, m.Delimiter)
+			var matched []string
+			for cName := range columns {
+				if candidates[cName] {
+					matched = append(matched, cName)
+				}
+			}
+			if len(matched) != 1 {
+				return fmt.Errorf(
+					"carta: basic sub-mapper for %v expected exactly one matching column "+
+						"(ancestors %v), got %d matches",
+					m.Typ, m.AncestorNames, len(matched),
+				)
+			}
+			cName := matched[0]
+			c := columns[cName]
 			presentColumns[cName] = column{
 				typ:         c.typ,
 				name:        cName,
 				columnIndex: c.columnIndex,
 			}
 			delete(columns, cName)
-			break
 		}
 	} else {
 		for i, field := range m.Fields {

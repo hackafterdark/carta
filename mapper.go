@@ -244,7 +244,7 @@ func determineFieldsNames(m *Mapper) error {
 				if tag := nameFromTag(field.Tag, CartaTagKey); tag != "" {
 					subMap.Delimiter = "->"
 					parts := strings.Split(tag, ",")
-					name = parts[0]
+					name = strings.TrimSpace(parts[0])
 					if len(parts) > 1 {
 						for _, part := range parts[1:] {
 							option := strings.Split(part, "=")
