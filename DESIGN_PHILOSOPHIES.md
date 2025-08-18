@@ -45,3 +45,12 @@ Making a guess might seem helpful, but it can hide serious, silent bugs. The fol
 -   **Destination:** `var blogs []BlogWithPosts`
 -   **Behavior:** `carta` **gracefully handles** the fact that the same blog ID appears in multiple rows. It creates one `Blog` object and appends each unique `Post` to its `Posts` slice.
 -   **Why this is Graceful:** This is the core purpose of the library. There is no ambiguity. The library uses the unique ID of the `Blog` (the `b.id` column) to understand that these rows all describe the same parent entity. This is a well-defined transformation, not a guess.
+
+---
+
+### Scenario 4: Default `_` Delimiter Support (Graceful Handling)
+
+-   **Query:** `SELECT b.id, a.id AS "author_id" FROM blogs b JOIN authors a ON b.author_id = a.id`
+-   **Destination:** `var blogs []BlogWithAuthor`
+-   **Behavior:** `carta` **gracefully handles** the `author_id` column, correctly mapping it to the `Author` struct's `id` field, even though the default delimiter is `->`.
+-   **Why this is Graceful:** This convenience was a deliberate design choice. Since SQL `SELECT` statements must have unambiguous column names (which you control with aliases), there is no risk of conflict with actual database field names that contain underscores. This allows for more natural-looking column names in queries without requiring an explicit `delimiter=_` option in the `carta` tag. If another delimiter is desired, it must be set explicitly.

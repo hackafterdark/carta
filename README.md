@@ -134,7 +134,7 @@ type User struct {
 ```
 
 #### Associations (Nested Structs)
-For nested structs (has-one or has-many relationships), use the `carta` tag to define a prefix for the nested struct's columns. The default delimiter between the prefix and the field name is `->`.
+For nested structs (has-one or has-many relationships), use the `carta` tag to define a prefix for the nested struct's columns. The default delimiter is `->`, but `_` is also supported out-of-the-box for convenience. This dual support does not create conflicts with field names containing underscores (e.g., `first_name`) because mapping is based on the final, unambiguous column names returned by your `SELECT` query, which you control via SQL aliases.
 
 **Example:**
 ```go
@@ -165,17 +165,17 @@ left join authors a on b.author_id = a.id
 This design promotes struct reusability. The `Author` struct can be used on its own to map to a query like `select id, username from authors` or as a nested struct within `Blog` as shown above.
 
 **Custom Delimiter:**
-You can override the default delimiter by specifying it in the `carta` tag.
+If you need to use a delimiter other than the default `->` or the supported `_`, you can override it by specifying it in the `carta` tag.
 ```go
 type Blog struct {
-    Author Author `carta:"author,delimiter=_"`
+    Author Author `carta:"author,delimiter=."` // Using a dot as a delimiter
 }
 ```
 **Corresponding SQL Query:**
 ```sql
 select
-    a.id as "author_id",
-    a.username as "author_username"
+    a.id as "author.id",
+    a.username as "author.username"
 ...
 ```
 
